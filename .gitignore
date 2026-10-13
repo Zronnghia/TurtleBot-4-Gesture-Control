@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+build/
+install/
+log/
+maps/backup_*/
+maps/autosave/

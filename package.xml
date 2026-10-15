@@ -2,10 +2,11 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>tb4_lab04</name>
-  <version>1.0.0</version>
+  <version>2.0.0</version>
   <description>
-    Bài thực hành 04 – TurtleBot 4 Simulation (ROS 2 Humble + Ignition Gazebo Fortress):
-    mô phỏng, SLAM Toolbox, localization (AMCL) và navigation (Nav2).
+    TurtleBot 4 Simulation (ROS 2 Humble + Ignition Gazebo Fortress): bản đồ SLAM Toolbox của tuần trước,
+    localization (AMCL), điều hướng tự động qua nhiều goal bằng nav2_simple_commander và nhận diện
+    vật thể từ camera bằng YOLO (ultralytics).
   </description>
   <maintainer email="student@example.com">Sinh vien</maintainer>
   <license>Apache-2.0</license>
@@ -25,6 +26,15 @@
   <exec_depend>nav2_map_server</exec_depend>
   <exec_depend>nav2_amcl</exec_depend>
   <exec_depend>nav2_msgs</exec_depend>
+  <exec_depend>nav2_simple_commander</exec_depend>
+  <exec_depend>lifecycle_msgs</exec_depend>
+
+  <!-- Vật thể trong Gazebo + nhận diện YOLO (ultralytics cài bằng pip – xem README) -->
+  <exec_depend>ros_gz_sim</exec_depend>
+  <exec_depend>cv_bridge</exec_depend>
+  <exec_depend>vision_msgs</exec_depend>
+  <exec_depend>visualization_msgs</exec_depend>
+  <exec_depend>python3-matplotlib</exec_depend>
 
   <!-- Hiển thị và điều khiển -->
   <exec_depend>rviz2</exec_depend>

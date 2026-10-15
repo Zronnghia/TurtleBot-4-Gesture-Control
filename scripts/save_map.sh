@@ -21,7 +21,7 @@ warn() { echo -e "\e[33m[CẢNH BÁO]\e[0m $*" >&2; }
 info() { echo -e "\e[32m[tb4_lab04]\e[0m $*"; }
 
 if ! command -v ros2 >/dev/null 2>&1; then
-  err "Không thấy lệnh ros2. Chạy: source /opt/ros/humble/setup.bash && source ~/tb4_ws/install/setup.bash"
+  err "Không thấy lệnh ros2. Chạy: source /opt/ros/humble/setup.bash && source ~/workspaces/tb4_gazebo/install/setup.bash"
   exit 1
 fi
 

@@ -1,13 +1,16 @@
-# Bài thực hành 04 – Phần 3 + 4: Localization (AMCL) và Navigation (Nav2) trên bản đồ đã tạo.
+# Localization (AMCL) + Navigation (Nav2) trên bản đồ đã tạo (map.yaml/map.pgm của tuần trước).
 #
 # Khởi chạy: Gazebo + TurtleBot 4 (spawn lại ở CÙNG vị trí như lúc mapping)
+#            + vật thể (người, xe, ghế, trụ cứu hoả, bình chữa cháy – config/objects.yaml,
+#              scripts/spawn_objects.py) ngay khi Gazebo sẵn sàng
 #            + map_server/AMCL (turtlebot4_navigation/localization.launch.py,
 #              config/localization.yaml)
 #            + Nav2 (turtlebot4_navigation/nav2.launch.py, config/nav2.yaml)
-#            + RViz2 (fixed frame map, có công cụ "Nav2 Goal").
+#            + RViz2 (fixed frame map, panel camera YOLO, marker goal, công cụ Publish Point).
 #
 #   ros2 launch tb4_lab04 navigation.launch.py                     # tự tìm maps/map.yaml của repo
-#   ros2 launch tb4_lab04 navigation.launch.py use_nav2:=false     # chỉ localization (Phần 3)
+#   ros2 launch tb4_lab04 navigation.launch.py use_nav2:=false     # chỉ localization
+#   ros2 launch tb4_lab04 navigation.launch.py spawn_objects:=false   # world maze trống như tuần trước
 #   ros2 launch tb4_lab04 navigation.launch.py map:=/duong/dan/map.yaml
 #
 # Thứ tự tìm bản đồ khi KHÔNG truyền map:=
@@ -100,18 +103,10 @@ def validate_map_yaml(path):
     return None
 
 
-def launch_setup(context, *args, **kwargs):
-    pkg_lab = get_package_share_directory(PKG)
+def stack_actions(context, map_path):
+    """[spawn vật thể, localization, Nav2] – chạy SAU khi mô phỏng sẵn sàng. Tách riêng để
+"""
     pkg_tb4_nav = get_package_share_directory('turtlebot4_navigation')
-
-    map_path, err = find_map(LaunchConfiguration('map').perform(context).strip(), pkg_lab)
-    if err is None:
-        err = validate_map_yaml(map_path)
-    if err is not None:
-        return [
-            LogInfo(msg='\n\n[tb4_lab04] LỖI BẢN ĐỒ: ' + err + '\n'),
-            Shutdown(reason='tb4_lab04: thiếu hoặc hỏng file bản đồ'),
-        ]
 
     # Scope nằm TRONG TimerAction (nếu đặt ngược, scope đã đóng khi timer kích hoạt).
     localization = TimerAction(
@@ -127,7 +122,7 @@ def launch_setup(context, *args, **kwargs):
                     # /scan_nav = /scan trễ 0.1 s (giờ mô phỏng) cho AMCL và 2 costmap của Nav2.
                     # Lý do: tf2_ros trên Humble có deadlock (Buffer::waitForTransform <->
                     # BufferCore::setTransformImpl) khi scan đến TRƯỚC transform odom->base_link
-                    # tương ứng; đã tái hiện và xác nhận bằng gdb (docs/TEST_REPORT.md). Trễ 0.1 s
+                    # tương ứng; đã tái hiện và xác nhận bằng gdb. Trễ 0.1 s
                     # đảm bảo transform luôn có sẵn khi scan tới -> không phát sinh yêu cầu chờ TF.
                     Node(package='topic_tools', executable='delay', name='scan_delay',
                          output='screen',
@@ -174,9 +169,34 @@ def launch_setup(context, *args, **kwargs):
         ],
     )
 
-    # Chỉ bật localization + Nav2 khi mô phỏng THỰC SỰ chạy (wait_for_sim.py thoát).
+    # Vật thể cho YOLO: spawn NGAY khi Gazebo chạy (trước AMCL/Nav2). Script chỉ gửi yêu cầu tạo entity
+    # (model đã có trong cache Fuel); thiếu model/mất mạng thì bỏ qua vật thể đó, không chặn mô phỏng.
+    spawn_args = ['--world', LaunchConfiguration('world')]
+    objects_file = LaunchConfiguration('objects_file').perform(context).strip()
+    if objects_file:
+        spawn_args += ['--objects', objects_file]
+    spawner = Node(package=PKG, executable='spawn_objects.py', name='tb4_lab04_spawn_objects',
+                   output='screen', arguments=spawn_args,
+                   condition=IfCondition(LaunchConfiguration('spawn_objects')))
+
+    return [spawner, localization, nav2]
+
+
+def launch_setup(context, *args, **kwargs):
+    pkg_lab = get_package_share_directory(PKG)
+
+    map_path, err = find_map(LaunchConfiguration('map').perform(context).strip(), pkg_lab)
+    if err is None:
+        err = validate_map_yaml(map_path)
+    if err is not None:
+        return [
+            LogInfo(msg='\n\n[tb4_lab04] LỖI BẢN ĐỒ: ' + err + '\n'),
+            Shutdown(reason='tb4_lab04: thiếu hoặc hỏng file bản đồ'),
+        ]
+
+    # Chỉ bật vật thể + localization + Nav2 khi mô phỏng THỰC SỰ chạy (wait_for_sim.py thoát).
     wait_for_sim = common.wait_for_sim_node()
-    start_stack = common.after_sim_ready(wait_for_sim, [localization, nav2])
+    start_stack = common.after_sim_ready(wait_for_sim, stack_actions(context, map_path))
 
     return [
         LogInfo(msg='[tb4_lab04] Dùng bản đồ: ' + map_path),
@@ -187,18 +207,19 @@ def launch_setup(context, *args, **kwargs):
     ]
 
 
-def generate_launch_description():
-    abort = common.abort_if_missing(common.PKGS_SIM + common.PKGS_NAV)
-    if abort is not None:
-        return abort
-    pkg_lab = get_package_share_directory(PKG)
-
-    arguments = common.sim_arguments(
-        'nav.rviz', world_note='PHẢI giống world lúc mapping (vị trí spawn x, y, yaw cũng vậy)') + [
+def nav_arguments(pkg_lab):
+    """Tham số riêng của launch này (dùng lại trong demo.launch.py)."""
+    return [
         DeclareLaunchArgument('map', default_value='',
                               description='Đường dẫn map.yaml (để trống = tự tìm maps/map.yaml)'),
         DeclareLaunchArgument('use_nav2', default_value='true', choices=['true', 'false'],
-                              description='false = chỉ chạy localization (Phần 3)'),
+                              description='false = chỉ chạy localization'),
+        DeclareLaunchArgument('spawn_objects', default_value='true', choices=['true', 'false'],
+                              description='Thêm vật thể (config/objects.yaml) vào world cho YOLO. '
+                                          'Lần đầu cần Internet (Gazebo Fuel) – tải trước: '
+                                          'ros2 run tb4_lab04 spawn_objects.py --download-only'),
+        DeclareLaunchArgument('objects_file', default_value='',
+                              description='File vật thể (trống = config/objects.yaml)'),
         DeclareLaunchArgument('localization_params_file',
                               default_value=os.path.join(pkg_lab, 'config', 'localization.yaml'),
                               description='Tham số AMCL + map_server'),
@@ -213,5 +234,14 @@ def generate_launch_description():
                                           'rồi mới bật Nav2'),
     ]
 
+
+def generate_launch_description():
+    abort = common.abort_if_missing(common.PKGS_SIM + common.PKGS_NAV)
+    if abort is not None:
+        return abort
+    pkg_lab = get_package_share_directory(PKG)
+    arguments = common.sim_arguments(
+        'nav.rviz', world_note='PHẢI giống world lúc mapping (vị trí spawn x, y, yaw cũng vậy)') + \
+        nav_arguments(pkg_lab)
     return LaunchDescription(arguments + common.render_env()
                              + [OpaqueFunction(function=launch_setup)])

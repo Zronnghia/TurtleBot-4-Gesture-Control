@@ -5,3 +5,8 @@ install/
 log/
 maps/backup_*/
 maps/autosave/
+# Model YOLO, kết quả chạy, file tạm
+*.pt
+*.onnx
+runs/
+docs/figures/auto_*.png

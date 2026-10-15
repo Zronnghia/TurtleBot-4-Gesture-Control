@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bài thực hành 04 – gom thông tin chẩn đoán vào MỘT file để gửi cho người hỗ trợ.
+# tb4_lab04 – gom thông tin chẩn đoán vào MỘT file để gửi cho người hỗ trợ.
 #
 #   ros2 run tb4_lab04 collect_debug.sh            # chạy khi đang gặp lỗi (launch vẫn mở càng tốt)
 #
@@ -57,9 +57,15 @@ section() { echo; echo "################ $* ################"; }
     done
     section "1 tin /scan (rút gọn)"
     timeout 15 ros2 topic echo --once /scan 2>&1 | grep -E 'frame_id|range_min|range_max' | head
+    section "Camera + YOLO"
+    timeout 12 ros2 topic hz /oakd/rgb/preview/image_raw --window 20 2>&1 | tail -2
+    timeout 12 ros2 topic hz /yolo/image_annotated --window 20 2>&1 | tail -2
     section "/dock_status"
     timeout 15 ros2 topic echo --once /dock_status 2>&1 | head -12
   fi
+
+  section "pip (YOLO)"
+  python3 -m pip list 2>/dev/null | grep -i -E '^(numpy|opencv|torch|torchvision|ultralytics) ' 
 
   section "Log launch gần nhất (~/.ros/log/latest/launch.log, 300 dòng cuối)"
   if [[ -f "${HOME}/.ros/log/latest/launch.log" ]]; then

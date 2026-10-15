@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bài thực hành 04 – kiểm tra môi trường TRƯỚC khi chạy mô phỏng.
+# tb4_lab04 – kiểm tra môi trường TRƯỚC khi chạy mô phỏng (Gazebo, Nav2, YOLO).
 #
 #   ros2 run tb4_lab04 doctor.sh        (hoặc: bash scripts/doctor.sh khi chưa build)
 #
@@ -48,13 +48,23 @@ fi
 if ! command -v ros2 >/dev/null 2>&1; then
   fail "Không có lệnh ros2 -> sudo apt install ros-humble-desktop"
 fi
+# Anaconda/Miniconda đang bật: python3 trỏ sang Python của conda -> rclpy/cv_bridge (build cho Python 3.10
+# hệ thống) không import được, pip cài YOLO vào nhầm môi trường.
+PY3="$(command -v python3 || true)"
+if [[ -n "${CONDA_PREFIX:-}" || "$PY3" == *conda* || "$PY3" == *miniforge* ]]; then
+  fail "Đang bật conda (python3 = $PY3) -> chạy 'conda deactivate' (và 'conda config --set auto_activate_base false'), mở terminal mới"
+elif [[ -n "$PY3" && "$PY3" != "/usr/bin/python3" ]]; then
+  warn "python3 = $PY3 (không phải /usr/bin/python3 của Ubuntu) – ROS 2 Humble cần Python 3.10 hệ thống"
+else
+  pass "python3 = $PY3 ($(python3 --version 2>&1))"
+fi
 
 # ---------------------------------------------------------------------------------------------
 echo "== 3. Gói ROS cần thiết (và có bị workspace khác 'ghi đè' không)"
 REQUIRED="turtlebot4_ignition_bringup turtlebot4_navigation turtlebot4_description turtlebot4_viz \
 irobot_create_nodes irobot_create_msgs irobot_create_ignition_bringup ros_gz_bridge ros_gz_sim ros_ign_gazebo \
 slam_toolbox nav2_bringup nav2_map_server nav2_amcl nav2_rviz_plugins rviz2 teleop_twist_keyboard \
-topic_tools tf2_ros_py sensor_msgs_py"
+topic_tools tf2_ros_py sensor_msgs_py nav2_simple_commander cv_bridge vision_msgs"
 if command -v python3 >/dev/null 2>&1; then
   # Một lần gọi Python cho tất cả gói (nhanh hơn gọi `ros2 pkg prefix` từng gói).
   PKG_REPORT="$(python3 - $REQUIRED <<'PY' 2>/dev/null
@@ -101,7 +111,7 @@ fi
 if command -v ros2 >/dev/null 2>&1 && ros2 pkg prefix tb4_lab04 >/dev/null 2>&1; then
   pass "tb4_lab04 (đã build và source workspace: $(ros2 pkg prefix tb4_lab04))"
 else
-  warn "tb4_lab04 chưa thấy -> cd ~/tb4_ws && colcon build && source install/setup.bash"
+  warn "tb4_lab04 chưa thấy -> cd ~/workspaces/tb4_gazebo && colcon build && source install/setup.bash"
 fi
 
 echo "== 4. Workspace đang được source (AMENT_PREFIX_PATH)"
@@ -204,6 +214,92 @@ if [[ -n "$MAPDIR" && -f "$MAPDIR/map.yaml" && -f "$MAPDIR/map.pgm" ]]; then
   pass "Có $MAPDIR/map.yaml + map.pgm"
 else
   info "Chưa có maps/map.yaml + map.pgm -> làm Phần 2 rồi chạy: ros2 run tb4_lab04 save_map.sh"
+fi
+
+# ---------------------------------------------------------------------------------------------
+echo "== 11. Python cho YOLO (ultralytics, OpenCV, NumPy, cv_bridge)"
+if command -v python3 >/dev/null 2>&1; then
+  PY_REPORT="$(python3 - <<'PY' 2>&1
+import importlib, sys
+def ver(name):
+    try:
+        m = importlib.import_module(name)
+        return getattr(m, '__version__', '?'), getattr(m, '__file__', '?')
+    except Exception as exc:
+        return None, '{}: {}'.format(type(exc).__name__, str(exc).splitlines()[0][:150] if str(exc) else '')
+for name in ('numpy', 'cv2', 'torch', 'ultralytics'):
+    v, where = ver(name)
+    print('MOD', name, v or '-', where, flush=True)
+try:
+    import numpy
+    if int(numpy.__version__.split('.')[0]) >= 2:
+        # cv_bridge (build với NumPy 1.x) làm tiến trình segfault với NumPy 2 -> không thử
+        raise RuntimeError('NumPy {} (cần < 2)'.format(numpy.__version__))
+    from cv_bridge import CvBridge
+    import numpy as np
+    from sensor_msgs.msg import Image
+    b = CvBridge()
+    m = Image(height=2, width=2, encoding='rgb8', step=6, data=bytes(12))
+    b.imgmsg_to_cv2(m, desired_encoding='bgr8')
+    print('BRIDGE OK', flush=True)
+except Exception as exc:
+    print('BRIDGE FAIL', type(exc).__name__, str(exc).splitlines()[0][:200] if str(exc) else '', flush=True)
+try:
+    import cv2
+    info = cv2.getBuildInformation()
+    gui = [l.split(':', 1)[1].strip() for l in info.splitlines() if l.strip().startswith('GUI:')]
+    print('CV2GUI', gui[0] if gui else '?')
+except Exception:
+    print('CV2GUI ?')
+PY
+)"
+  NP_VER="$(awk '$1=="MOD" && $2=="numpy" {print $3}' <<< "$PY_REPORT")"
+  while read -r tag name v where; do
+    [[ "$tag" != "MOD" ]] && continue
+    if [[ "$v" == "-" ]]; then
+      case "$name" in
+        numpy) fail "numpy chưa cài -> sudo apt install python3-numpy" ;;
+        cv2) fail "OpenCV (cv2) chưa có -> pip3 install --user \"opencv-python<4.11\"" ;;
+        torch|ultralytics) fail "$name chưa cài -> xem README mục cài đặt YOLO ($where)" ;;
+      esac
+    elif [[ "$name" == numpy && "$v" == 2.* ]]; then
+      :   # báo FAIL riêng ngay bên dưới
+    else
+      pass "$name $v ($where)"
+    fi
+  done <<< "$PY_REPORT"
+  if [[ "$NP_VER" == 2.* ]]; then
+    fail "NumPy $NP_VER: cv_bridge của ROS 2 Humble (apt) build với NumPy 1.x -> lỗi khi chuyển ảnh. Sửa: pip3 install --user \"numpy<2\" \"opencv-python<4.11\""
+  fi
+  if grep -q '^BRIDGE OK' <<< "$PY_REPORT"; then
+    pass "cv_bridge chuyển được sensor_msgs/Image -> OpenCV"
+  else
+    fail "cv_bridge lỗi: $(grep '^BRIDGE' <<< "$PY_REPORT" | cut -c13-) -> sudo apt install ros-humble-cv-bridge; nếu lỗi NumPy: pip3 install --user \"numpy<2\""
+  fi
+  GUI="$(awk '$1=="CV2GUI" {$1=""; print substr($0,2)}' <<< "$PY_REPORT")"
+  if [[ "$GUI" == "NONE" || -z "$GUI" ]]; then
+    warn "OpenCV không có GUI (opencv-python-headless?) -> cửa sổ YOLO không mở được; vẫn xem trên RViz2. Sửa: pip3 uninstall -y opencv-python-headless && pip3 install --user \"opencv-python<4.11\""
+  else
+    pass "OpenCV GUI: $GUI"
+  fi
+fi
+WDIR="${HOME}/.cache/tb4_lab04/models"
+if ls "$WDIR"/*.pt >/dev/null 2>&1; then
+  pass "Model YOLO đã tải: $(cd "$WDIR" && ls *.pt | tr '\n' ' ')"
+else
+  info "Chưa có model YOLO trong $WDIR (lần chạy đầu yolo_detector.py tự tải – cần Internet)"
+fi
+
+echo "== 12. Model Gazebo Fuel cho vật thể (config/objects.yaml)"
+if command -v ros2 >/dev/null 2>&1 && ros2 pkg prefix tb4_lab04 >/dev/null 2>&1; then
+  LIST="$(timeout 30 ros2 run tb4_lab04 spawn_objects.py --list 2>&1)"
+  NOK="$(grep -c 'có trong cache' <<< "$LIST")"
+  NMISS="$(grep -c 'CHƯA tải' <<< "$LIST")"
+  if (( NMISS == 0 && NOK > 0 )); then
+    pass "$NOK model vật thể đã có trong cache Fuel"
+  else
+    warn "$NMISS model vật thể chưa tải -> ros2 run tb4_lab04 spawn_objects.py --download-only (cần Internet)"
+  fi
 fi
 
 echo

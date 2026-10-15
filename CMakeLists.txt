@@ -3,7 +3,7 @@ project(tb4_lab04)
 
 find_package(ament_cmake REQUIRED)
 
-# Launch, cấu hình, RViz và bản đồ -> share/tb4_lab04/
+# Launch, cấu hình (goal, vật thể, YOLO, Nav2...), RViz và bản đồ -> share/tb4_lab04/
 # (thư mục maps/ luôn có README.md nên không bao giờ rỗng -> install không lỗi
 #  ngay cả khi chưa làm Phần 2)
 install(
@@ -23,10 +23,23 @@ install(
     scripts/check_map.py
     scripts/clean_map.py
     scripts/wait_for_sim.py
+    scripts/waypoint_navigator.py
+    scripts/yolo_detector.py
+    scripts/spawn_objects.py
+    scripts/goal_recorder.py
+    scripts/check_goals.py
+    scripts/localization_check.py
     scripts/save_map.sh
     scripts/kill_sim.sh
     scripts/doctor.sh
+    scripts/install_yolo_deps.sh
     scripts/collect_debug.sh
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+# Module Python dùng chung, được các script trên `import lab_common` (cùng thư mục, không chạy trực tiếp)
+install(
+  FILES scripts/lab_common.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

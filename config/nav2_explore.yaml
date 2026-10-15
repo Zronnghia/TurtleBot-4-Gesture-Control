@@ -195,7 +195,7 @@ local_costmap:
         observation_sources: scan
         scan:
           # tb4_lab04: dùng /scan_nav (= /scan trễ 0.1 s, do navigation.launch.py tạo) thay vì /scan
-          # để tránh deadlock tf2_ros trên Humble – xem docs/TEST_REPORT.md.
+          # để tránh deadlock tf2_ros trên Humble.
           topic: /scan_nav
           max_obstacle_height: 2.0
           clearing: True
@@ -245,7 +245,7 @@ global_costmap:
         observation_sources: scan
         scan:
           # tb4_lab04: dùng /scan_nav (= /scan trễ 0.1 s, do navigation.launch.py tạo) thay vì /scan
-          # để tránh deadlock tf2_ros trên Humble – xem docs/TEST_REPORT.md.
+          # để tránh deadlock tf2_ros trên Humble.
           topic: /scan_nav
           max_obstacle_height: 2.0
           clearing: True

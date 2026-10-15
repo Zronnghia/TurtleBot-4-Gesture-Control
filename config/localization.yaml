@@ -50,7 +50,7 @@ amcl:
     z_max: 0.05
     z_rand: 0.5
     z_short: 0.05
-    # tb4_lab04: /scan_nav = /scan trễ 0.1 s (xem navigation.launch.py, docs/TEST_REPORT.md)
+    # tb4_lab04: /scan_nav = /scan trễ 0.1 s (xem navigation.launch.py)
     scan_topic: /scan_nav
     # --- Thêm cho bài lab: tự đặt initial pose (xem giải thích ở đầu file) ---
     set_initial_pose: true

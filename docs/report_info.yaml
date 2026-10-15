@@ -1,0 +1,4 @@
+# Thông tin cho docs/report/build_report.py. Điền link rồi chạy:
+#   python3 docs/report/build_report.py
+link_video: ""        # Google Drive, chế độ "Anyone with the link"
+link_github: ""       # GitHub repository (Public)

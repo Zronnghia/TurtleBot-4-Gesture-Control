@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Unit test cho phần logic thuần (không cần ROS đang chạy).
 
-    cd ~/tb4_ws/src/tb4_lab04 && python3 -m pytest test/ -q     # hoặc
+    cd ~/workspaces/tb4_gazebo/src/tb4_lab04 && python3 -m pytest test/ -q     # hoặc
     python3 test/test_pure_logic.py
 
 Phần kiểm tra hàm trong navigation.launch.py chỉ chạy khi import được `launch`

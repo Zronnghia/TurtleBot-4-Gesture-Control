@@ -242,7 +242,7 @@ class TestLaunchCommon(unittest.TestCase):
         self.assertIsNone(self.common.abort_if_missing(['launch']))
 
     def test_worlds_and_package_lists(self):
-        self.assertEqual(self.common.WORLDS, ['maze', 'depot', 'warehouse'])
+        self.assertEqual(self.common.WORLDS, ['maze', 'depot', 'warehouse', 'gesture_arena'])
         self.assertIn('topic_tools', self.common.PKGS_NAV)   # /scan_nav cần topic_tools/delay
         self.assertIn('slam_toolbox', self.common.PKGS_SLAM)
 

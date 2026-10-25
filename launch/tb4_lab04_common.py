@@ -23,8 +23,9 @@ import os
 
 from ament_index_python.packages import PackageNotFoundError, get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import (DeclareLaunchArgument, GroupAction, IncludeLaunchDescription,
-                            LogInfo, RegisterEventHandler, SetEnvironmentVariable, Shutdown)
+from launch.actions import (AppendEnvironmentVariable, DeclareLaunchArgument, GroupAction,
+                            IncludeLaunchDescription, LogInfo, RegisterEventHandler,
+                            SetEnvironmentVariable, Shutdown)
 from launch.conditions import IfCondition, UnlessCondition
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -32,7 +33,7 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node, SetParametersFromFile
 
 PKG = 'tb4_lab04'
-WORLDS = ['maze', 'depot', 'warehouse']
+WORLDS = ['maze', 'depot', 'warehouse', 'gesture_arena']  # gesture_arena: worlds/ của repo (Bài 6)
 
 # Gói cần cho từng bước (tên gói ROS; tên apt = ros-humble-<tên, '_' -> '-'>).
 PKGS_SIM = ['turtlebot4_ignition_bringup', 'turtlebot4_description', 'turtlebot4_navigation',
@@ -69,11 +70,12 @@ def abort_if_missing(names):
     return LaunchDescription([LogInfo(msg=msg), Shutdown(reason='tb4_lab04: thiếu gói ROS')])
 
 
-def sim_arguments(rviz_file, world_note='World Gazebo có sẵn của TurtleBot 4'):
+def sim_arguments(rviz_file, world_note='World Gazebo có sẵn của TurtleBot 4', default_world='maze',
+                  default_rviz='true'):
     """Tham số chung của mọi launch có mô phỏng."""
     pkg_lab = get_package_share_directory(PKG)
     return [
-        DeclareLaunchArgument('world', default_value='maze', choices=WORLDS,
+        DeclareLaunchArgument('world', default_value=default_world, choices=WORLDS,
                               description=world_note),
         DeclareLaunchArgument('model', default_value='standard', choices=['standard', 'lite'],
                               description='Mẫu TurtleBot 4'),
@@ -81,7 +83,7 @@ def sim_arguments(rviz_file, world_note='World Gazebo có sẵn của TurtleBot 
         DeclareLaunchArgument('y', default_value='0.0', description='Vị trí spawn y (m)'),
         DeclareLaunchArgument('z', default_value='0.0', description='Vị trí spawn z (m)'),
         DeclareLaunchArgument('yaw', default_value='0.0', description='Hướng spawn (rad)'),
-        DeclareLaunchArgument('use_rviz', default_value='true', choices=['true', 'false'],
+        DeclareLaunchArgument('use_rviz', default_value=default_rviz, choices=['true', 'false'],
                               description='Mở RViz2'),
         DeclareLaunchArgument('rviz_config',
                               default_value=os.path.join(pkg_lab, 'rviz', rviz_file),
@@ -105,6 +107,16 @@ def render_env():
                                    condition=IfCondition(LaunchConfiguration('software_render')))]
 
 
+def world_resource_env():
+    """Cho Gazebo tìm thấy world của repo (worlds/gesture_arena.sdf).
+
+    Launch của TurtleBot 4 GHI ĐÈ IGN_GAZEBO_RESOURCE_PATH (SetEnvironmentVariable), nên không thể thêm
+    thư mục vào biến đó. Gazebo Fortress 6.16 (bản apt hiện tại của Humble) đọc thêm GZ_SIM_RESOURCE_PATH
+    -> nối thư mục worlds/ của package vào biến này. Không ảnh hưởng các world có sẵn (maze, depot...)."""
+    return [AppendEnvironmentVariable('GZ_SIM_RESOURCE_PATH',
+                                      os.path.join(get_package_share_directory(PKG), 'worlds'))]
+
+
 def rviz_node():
     return Node(
         package='rviz2', executable='rviz2', name='rviz2',
@@ -121,6 +133,7 @@ def turtlebot4_sim(extra_param_actions=()):
     pkg_lab = get_package_share_directory(PKG)
     pkg_tb4_ign = get_package_share_directory('turtlebot4_ignition_bringup')
     return GroupAction(scoped=False, actions=[
+        *world_resource_env(),
         # Tham số motion_control của Create 3 phải đặt LÚC KHỞI ĐỘNG (đổi lúc chạy bị từ chối).
         # Khoá /**/motion_control trong file nên chỉ node đó dùng.
         SetParametersFromFile(

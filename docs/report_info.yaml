@@ -1,4 +1,14 @@
-# Thông tin cho docs/report/build_report.py. Điền link rồi chạy:
-#   python3 docs/report/build_report.py
+# Thông tin cho báo cáo PDF. Điền link rồi chạy:
+#   python3 docs/report/build_report_bai6.py      (Bài 6 – cử chỉ tay)
+#   python3 docs/report/build_report.py           (Bài 5 – Nav2 + YOLO)
+ho_ten: "Lê Trọng Nghĩa"
 link_video: ""        # Google Drive, chế độ "Anyone with the link"
 link_github: ""       # GitHub repository (Public)
+
+# (tuỳ chọn, Bài 6) Bảng kết quả thử nghiệm của bạn – mỗi dòng: ["thử nghiệm", "kết quả"]
+ket_qua: []
+#  - ["Vẫy tay -> ngón cái", "robot xoay trái-phải, về đúng hướng (sai lệch ~3°)"]
+#  - ["2 ngón -> ngón cái -> xoè tay giữa chừng", "robot dừng sau ~0,3 s"]
+
+# (tuỳ chọn, Bài 6) Nhận xét thêm của bạn (một đoạn văn)
+nhan_xet: ""

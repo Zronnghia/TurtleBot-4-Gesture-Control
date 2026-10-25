@@ -260,7 +260,7 @@ PY
       case "$name" in
         numpy) fail "numpy chưa cài -> sudo apt install python3-numpy" ;;
         cv2) fail "OpenCV (cv2) chưa có -> pip3 install --user \"opencv-python<4.11\"" ;;
-        torch|ultralytics) fail "$name chưa cài -> xem README mục cài đặt YOLO ($where)" ;;
+        torch|ultralytics) warn "$name chưa cài – chỉ cần cho node YOLO (Bài 5): bash scripts/install_yolo_deps.sh" ;;
       esac
     elif [[ "$name" == numpy && "$v" == 2.* ]]; then
       :   # báo FAIL riêng ngay bên dưới
@@ -300,6 +300,46 @@ if command -v ros2 >/dev/null 2>&1 && ros2 pkg prefix tb4_lab04 >/dev/null 2>&1;
   else
     warn "$NMISS model vật thể chưa tải -> ros2 run tb4_lab04 spawn_objects.py --download-only (cần Internet)"
   fi
+fi
+
+echo "== 13. Bài 6 – cử chỉ tay (MediaPipe, model, webcam)"
+if command -v python3 >/dev/null 2>&1; then
+  MP_REPORT="$(python3 - <<'PY' 2>&1
+try:
+    import mediapipe as mp
+    from mediapipe.tasks.python import vision  # noqa: F401
+    print('MP', getattr(mp, '__version__', '?'))
+except Exception as exc:
+    print('MPFAIL', type(exc).__name__, str(exc).splitlines()[0][:150] if str(exc) else '')
+PY
+)"
+  if grep -q '^MP ' <<< "$MP_REPORT"; then
+    pass "mediapipe $(awk '$1=="MP"{print $2}' <<< "$MP_REPORT") (Gesture Recognizer)"
+  else
+    fail "mediapipe chưa dùng được: $(cut -c8- <<< "$MP_REPORT") -> bash scripts/install_gesture_deps.sh"
+  fi
+fi
+GDIR=""
+if command -v ros2 >/dev/null 2>&1 && PREFIX="$(ros2 pkg prefix tb4_lab04 2>/dev/null)"; then
+  GDIR="$PREFIX/share/tb4_lab04"
+fi
+if [[ -n "$GDIR" && -s "$GDIR/models/gesture_recognizer.task" ]]; then
+  pass "Model gesture_recognizer.task có sẵn"
+elif [[ -s "$HOME/.cache/tb4_lab04/models/gesture_recognizer.task" ]]; then
+  pass "Model gesture_recognizer.task trong ~/.cache/tb4_lab04/models"
+else
+  warn "Chưa thấy models/gesture_recognizer.task – node sẽ tự tải (cần Internet) hoặc build lại package"
+fi
+if [[ -n "$GDIR" && -f "$GDIR/worlds/gesture_arena.sdf" ]]; then
+  pass "World gesture_arena đã install"
+elif [[ -n "$GDIR" ]]; then
+  fail "Thiếu share/tb4_lab04/worlds/gesture_arena.sdf -> colcon build --symlink-install --packages-select tb4_lab04"
+fi
+if ls /dev/video* >/dev/null 2>&1; then
+  pass "Webcam: $(ls /dev/video* | tr '\n' ' ')"
+  id -nG 2>/dev/null | grep -qw video || warn "User chưa thuộc nhóm video – nếu không mở được webcam: sudo usermod -aG video \$USER (đăng nhập lại)"
+else
+  warn "Không có /dev/video* – webcam chưa được nhận (máy ảo/WSL2: chuyển webcam vào trong)"
 fi
 
 echo

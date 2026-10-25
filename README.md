@@ -1,29 +1,34 @@
-# TurtleBot 4 – Localization, Navigation tự động (Nav2) và nhận diện vật thể bằng YOLO
+# TurtleBot 4 – Giao tiếp phi ngôn ngữ: điều khiển bằng cử chỉ tay (Bài 6)
 
-ROS 2 Humble · Ignition Gazebo Fortress · TurtleBot 4 Simulator · Nav2 · nav2_simple_commander · ultralytics YOLO
+ROS 2 Humble · Ignition Gazebo Fortress · TurtleBot 4 Simulator · OpenCV · MediaPipe Gesture Recognizer
 
-Dùng lại **bản đồ của tuần trước** (`maps/map.yaml` + `maps/map.pgm`, world `maze`) để:
+Webcam laptop → **`gesture_recognition_node`** (OpenCV + MediaPipe, nhận diện 7 cử chỉ + vẫy tay) →
+`/detected_gesture` → **`robot_behavior_node`** (máy trạng thái chọn → xác nhận → thực hiện, chống nhiễu,
+watchdog) → `/cmd_vel` → TurtleBot 4 trong Gazebo.
 
-1. khởi chạy lại TurtleBot 4 trong đúng world `maze`, **thêm vật thể** (người, xe hơi, ghế, trụ cứu hoả, bình chữa
-   cháy), nạp bản đồ và định vị bằng **AMCL**;
-2. khảo sát, ghi toạ độ `(x, y, yaw)` của các điểm mục tiêu trên bản đồ;
-3. một **ROS 2 node Python** (`waypoint_navigator.py`, thư viện `nav2_simple_commander`) tự đưa robot đi
-   **Goal 1 → Goal 2 → Goal 3** – không chạm bàn phím, không đặt goal bằng chuột;
-4. một **ROS 2 node YOLO** (`yolo_detector.py`) nhận ảnh camera `/oakd/rgb/preview/image_raw`, chuyển sang OpenCV
-   bằng `cv_bridge`, nhận diện bằng YOLO, vẽ bounding box + tên lớp + độ tự tin lên cửa sổ OpenCV **và** topic
-   `/yolo/image_annotated` (xem trên RViz2), in danh sách vật thể ra terminal.
-
-| Phần của đề | Lệnh chính | Bằng chứng (quay video / đưa vào báo cáo) |
+| Cử chỉ | Tên trên `/detected_gesture` | Hành vi robot |
 |---|---|---|
-| 1 – Simulation + bản đồ + AMCL | `ros2 launch tb4_lab04 navigation.launch.py` | `localization_check.py` → `ĐẠT`; RViz2: chấm LiDAR trùng tường |
-| 2 – Toạ độ mục tiêu | `ros2 run tb4_lab04 goal_recorder.py` (Publish Point / `/amcl_pose`) | `check_goals.py --plot` → ảnh bản đồ + goal |
-| 3 – Navigation bằng code | `ros2 run tb4_lab04 waypoint_navigator.py` | bảng `TỔNG KẾT` → `ĐẠT`, `run.json` + ảnh quỹ đạo |
-| 4 – YOLO | `ros2 launch tb4_lab04 yolo.launch.py` | cửa sổ YOLO, log `PHÁT HIỆN MỚI`, ảnh `best_<lớp>.jpg` |
-| Tất cả một lệnh | `ros2 launch tb4_lab04 demo.launch.py` | – |
-| Báo cáo PDF | `python3 docs/report/build_report.py` | `docs/report/BaoCao_Bai5_TurtleBot4_Nav2_YOLO.pdf` |
+| Vẫy tay | `Wave` | **chọn** “chào lại”: xoay trái–phải (±34°, 2 lần) |
+| Giơ 1 ngón tay | `Pointing_Up` | **chọn** tiến–lùi 4 lần (0,35 m mỗi lần) |
+| Giơ 2 ngón tay | `Victory` | **chọn** quỹ đạo tròn (r = 0,5 m, 1 vòng) |
+| Ngón cái | `Thumb_Up` | **xác nhận** → thực hiện hành vi đã chọn |
+| Xoè bàn tay | `Open_Palm` | **dừng ngay** (giữ lựa chọn – ngón cái lần nữa = chạy lại từ đầu) |
+| Nắm tay | `Closed_Fist` | **huỷ** hành vi + xoá lựa chọn → trạng thái chờ |
 
-Chỉ cần danh sách lệnh: [`HUONG_DAN_NHANH.md`](HUONG_DAN_NHANH.md). Tài liệu bài tuần trước (cài đặt đầy đủ, SLAM):
-[`docs/LAB04_SLAM_README.md`](docs/LAB04_SLAM_README.md).
+Model MediaPipe còn nhận `Thumb_Down`, `ILoveYou` (hiển thị/publish nhưng không gắn hành vi) → tổng cộng
+**8 cử chỉ** (yêu cầu tối thiểu 5).
+
+| Phần của đề | Lệnh | Bằng chứng |
+|---|---|---|
+| 1 – Simulation + `/cmd_vel` + webcam | `ros2 launch tb4_lab04 gesture_sim.launch.py` · `ros2 run tb4_lab04 check_cmd_vel.py` · `ros2 run tb4_lab04 webcam_test.py` | robot quay/tiến/lùi, `KẾT QUẢ: ĐẠT`; cửa sổ webcam + FPS |
+| 2 – Nhận diện cử chỉ | `ros2 launch tb4_lab04 gesture.launch.py run_behavior:=false` · `ros2 topic echo /detected_gesture` | cửa sổ: landmark, tên cử chỉ, % tin cậy |
+| 3 – Điều khiển robot | `ros2 launch tb4_lab04 gesture.launch.py` | robot làm đúng 6 hành vi; log `[trạng thái]`; `plot_gesture_run.py` |
+| Tất cả một lệnh | `ros2 launch tb4_lab04 gesture_demo.launch.py` | – |
+| Báo cáo PDF | `python3 docs/report/build_report_bai6.py` | `docs/report/BaoCao_Bai6_TurtleBot4_Gesture.pdf` |
+
+Repo vẫn giữ nguyên các bài trước (SLAM, Nav2 + YOLO): [`docs/LAB05_NAV2_YOLO_README.md`](docs/LAB05_NAV2_YOLO_README.md),
+[`docs/LAB04_SLAM_README.md`](docs/LAB04_SLAM_README.md). Tên package vẫn là `tb4_lab04` (đổi tên sẽ làm hỏng
+workspace và lệnh của các bài trước).
 
 ---
 
@@ -31,15 +36,15 @@ Chỉ cần danh sách lệnh: [`HUONG_DAN_NHANH.md`](HUONG_DAN_NHANH.md). Tài 
 
 0. [Đọc trước – những điều hay làm hỏng bài](#0-đọc-trước--những-điều-hay-làm-hỏng-bài)
 1. [Cài đặt](#1-cài-đặt)
-2. [Phần 1 – Simulation, nạp bản đồ, Localization](#2-phần-1--simulation-nạp-bản-đồ-localization)
-3. [Phần 2 – Khảo sát toạ độ mục tiêu](#3-phần-2--khảo-sát-toạ-độ-mục-tiêu)
-4. [Phần 3 – Navigation tự động bằng code](#4-phần-3--navigation-tự-động-bằng-code)
-5. [Phần 4 – Nhận diện vật thể bằng YOLO](#5-phần-4--nhận-diện-vật-thể-bằng-yolo)
-6. [Chạy tất cả bằng một lệnh](#6-chạy-tất-cả-bằng-một-lệnh)
-7. [Kịch bản quay video demo](#7-kịch-bản-quay-video-demo)
-8. [Nộp bài: GitHub, video, báo cáo PDF](#8-nộp-bài-github-video-báo-cáo-pdf)
+2. [Phần 1 – Simulation, kiểm tra /cmd_vel, webcam](#2-phần-1--simulation-kiểm-tra-cmd_vel-webcam)
+3. [Phần 2 – Node nhận diện cử chỉ](#3-phần-2--node-nhận-diện-cử-chỉ)
+4. [Phần 3 – Node điều khiển hành vi](#4-phần-3--node-điều-khiển-hành-vi)
+5. [Chạy demo và kịch bản quay video](#5-chạy-demo-và-kịch-bản-quay-video)
+6. [Thử không cần webcam](#6-thử-không-cần-webcam)
+7. [Kết quả, log, ảnh quỹ đạo](#7-kết-quả-log-ảnh-quỹ-đạo)
+8. [Nộp bài: GitHub, Google Drive, PDF](#8-nộp-bài-github-google-drive-pdf)
 9. [Xử lý sự cố](#9-xử-lý-sự-cố)
-10. [Kiến trúc: package, node, topic, action](#10-kiến-trúc-package-node-topic-action)
+10. [Kiến trúc: node, topic, luồng xử lý](#10-kiến-trúc-node-topic-luồng-xử-lý)
 11. [Tham số](#11-tham-số)
 12. [Kiểm thử và giới hạn](#12-kiểm-thử-và-giới-hạn)
 
@@ -47,73 +52,61 @@ Chỉ cần danh sách lệnh: [`HUONG_DAN_NHANH.md`](HUONG_DAN_NHANH.md). Tài 
 
 ## 0. Đọc trước – những điều hay làm hỏng bài
 
-1. **Ubuntu 22.04 + ROS 2 Humble + Gazebo Fortress** – như tuần trước. Mỗi terminal chỉ `source` ROS 2 Humble và
-   workspace này; luôn `export ROS_LOCALHOST_ONLY=1` (phòng lab nhiều máy).
-2. **`pip install ultralytics` có thể kéo NumPy 2.x về → `cv_bridge` của Humble (build với NumPy 1.x) hỏng.**
-   Luôn cài kèm `"numpy<2" "opencv-python<4.11"` như mục 1.3. `doctor.sh` phát hiện lỗi này.
-3. **World + vị trí spawn phải giống lúc làm bản đồ** (mặc định `world:=maze`, x = y = yaw = 0). Toạ độ map của
-   bản đồ tuần trước trùng toạ độ Gazebo – vì vậy initial pose (0, 0, 0) đúng và goal mẫu dùng được.
-4. **Robot khởi động khi đang đỗ trong dock.** `waypoint_navigator.py` tự undock; chạy tay thì phải undock trước.
-5. **Vật thể lấy từ Gazebo Fuel – lần đầu cần Internet.** Tải trước 1 lần: `spawn_objects.py --download-only`.
-   Không có mạng thì bài vẫn chạy (world trống), chỉ thiếu vật thể cho YOLO.
-6. **Chỉ một phiên mô phỏng một lúc**: trước mỗi lần chạy lại `Ctrl+C` rồi `ros2 run tb4_lab04 kill_sim.sh`.
-7. **Không điều khiển tay sau khi chạy node điều hướng** (đề yêu cầu): tắt teleop, không dùng Nav2 Goal.
-8. **Không bật Anaconda/conda trong terminal chạy ROS.** Khi `(base)` hiện đầu dòng lệnh, `python3` là Python của
-   conda → `rclpy`, `cv_bridge` lỗi import và `pip` cài YOLO nhầm chỗ. Chạy `conda deactivate`
-   (tắt hẳn: `conda config --set auto_activate_base false`). `doctor.sh` kiểm tra điều này.
-9. Log đỏ/vàng của mô phỏng TurtleBot 4 phần lớn là bình thường (danh sách ở
-   [docs/LAB04_SLAM_README.md mục 8.1](docs/LAB04_SLAM_README.md#81-log-trông-như-lỗi-nhưng-bình-thường)).
-   Đánh giá bằng các script kiểm tra.
+1. **Webcam phải thấy được từ Ubuntu.** Ubuntu cài thẳng trên máy: OK. **Máy ảo** (VirtualBox/VMware): bật
+   chuyển webcam vào máy ảo (VirtualBox: *Devices → Webcams*). **WSL2**: phải chuyển USB bằng `usbipd` (webcam
+   laptop nhiều khi không làm được) – nên dùng Ubuntu cài thật. Kiểm tra: `ls /dev/video*`, `webcam_test.py`.
+2. **`pip install mediapipe` (bản mới nhất) kéo NumPy 2 về → `cv_bridge` và node YOLO của bài trước hỏng.**
+   Dùng `bash scripts/install_gesture_deps.sh` (ghim `mediapipe==0.10.21`, `numpy<2`, OpenCV 4.10).
+3. **Không bật conda** trong terminal chạy ROS (`(base)` ở đầu dòng → `conda deactivate`).
+4. **Robot khởi động khi đang ở dock.** `robot_behavior_node` tự **undock + chạy thẳng 1 m ra giữa sân** (mất
+   ~20–40 s, cửa sổ webcam ghi `Robot: SETUP`). Chờ tới khi hiện `Robot: IDLE` / `WAITING` rồi mới ra cử chỉ.
+   Nếu bước này bị huỷ (xoè tay / nắm tay / mất tín hiệu), lần xác nhận đầu tiên sẽ làm nốt trước rồi mới chạy
+   hành vi: còn trong dock → undock + ra giữa sân; đã lùi ra nửa chừng (có thể còn quay mặt vào dock) → quay mặt
+   ra xa dock rồi chạy ra giữa sân. Không bao giờ chạy tiến / vòng tròn ngay cạnh dock.
+5. **Robot chỉ chạy sau ngón cái xác nhận** và chỉ phản ứng khi cử chỉ **thay đổi**. Giữ một cử chỉ ~0,5 s cho
+   tới khi dòng `ON DINH -> /detected_gesture` đổi, sau đó **hạ tay** (hoặc đổi cử chỉ) rồi mới ra lệnh tiếp.
+6. **Vẫy tay bắt đầu bằng bàn tay xoè** → robot nhận `Open_Palm` (dừng) trước, rồi `Wave`. Đó là thiết kế
+   (dừng luôn được ưu tiên); vẫy khi robot đang chạy sẽ làm robot dừng.
+7. **Không có cử chỉ nào trong 1 s (node nhận diện tắt / camera lỗi) → robot dừng** (`SIGNAL_LOST`). Tay ra khỏi
+   khung hình thì KHÔNG dừng (node vẫn gửi `None`) – robot tiếp tục hành vi đã xác nhận.
+8. Một phiên mô phỏng một lúc: `Ctrl+C` rồi `ros2 run tb4_lab04 kill_sim.sh` trước khi chạy lại. Script còn xoá
+   file shared-memory cũ của FastDDS (`/dev/shm/fastrtps_*`) – khi kiểm thử, các file này (do tiến trình bị
+   kill để lại) đã làm Gazebo đứng ở bước nạp world, không bao giờ có `/odom`.
+9. Log đỏ/vàng của mô phỏng TurtleBot 4 phần lớn là bình thường
+   ([danh sách](docs/LAB04_SLAM_README.md#81-log-trông-như-lỗi-nhưng-bình-thường)).
 
 ---
 
 ## 1. Cài đặt
 
-### 1.1. Gói ROS / hệ thống
+### 1.1. Gói ROS
 
-Đã cài đủ môi trường tuần trước (ROS 2 Humble, Gazebo Fortress, TurtleBot 4 simulator, Nav2, SLAM Toolbox – xem
-[docs/LAB04_SLAM_README.md mục 1](docs/LAB04_SLAM_README.md#1-cài-đặt-làm-một-lần) nếu cài máy mới). Thêm các
-gói của bài này:
+Đã có môi trường các bài trước (ROS 2 Humble, Gazebo Fortress, TurtleBot 4 simulator). Máy mới:
+[`docs/LAB04_SLAM_README.md` mục 1](docs/LAB04_SLAM_README.md#1-cài-đặt-làm-một-lần). Bài này chỉ cần thêm
+`irobot_create_msgs` (đã có cùng simulator) và `tf2_ros`:
 
 ```bash
 sudo apt update
-sudo apt install -y ros-humble-turtlebot4-navigation ros-humble-nav2-simple-commander \
-  ros-humble-cv-bridge ros-humble-vision-msgs ros-humble-ros-gz-sim ros-humble-topic-tools \
-  python3-pip python3-matplotlib python3-yaml fonts-dejavu-core
+sudo apt install -y ros-humble-turtlebot4-simulator ros-humble-irobot-create-msgs ros-humble-tf2-ros \
+  python3-pip python3-matplotlib python3-yaml v4l-utils
 ```
 
 ### 1.2. Workspace và build
 
 ```bash
 mkdir -p ~/workspaces/tb4_gazebo/src && cd ~/workspaces/tb4_gazebo/src
-# A) từ file nén:   tar -xzf ~/Downloads/tb4_lab04.tar.gz -C ~/workspaces/tb4_gazebo/src
-# B) từ GitHub:     git clone https://github.com/<ten-ban>/<repo>.git tb4_lab04
+# A) từ file nén:  tar -xJf ~/Downloads/tb4_lab06.tar.xz -C ~/workspaces/tb4_gazebo/src
+# B) từ GitHub:    git clone https://github.com/<ten-ban>/<repo>.git tb4_lab04
 cd ~/workspaces/tb4_gazebo
 source /opt/ros/humble/setup.bash
-rosdep install --from-paths src --ignore-src -y      # cài nốt gói apt còn thiếu (theo package.xml)
-colcon build --symlink-install --packages-select tb4_lab04   # chỉ build gói này (workspace có thể chứa gói khác)
+colcon build --symlink-install --packages-select tb4_lab04
 source install/setup.bash
 ```
 
-`--symlink-install`: sửa script/config trong `src/` là có hiệu lực ngay, không cần build lại. Bản đồ, `goals.yaml`,
-`objects.yaml` luôn được đọc từ thư mục **source** (`src/tb4_lab04/...`), kể cả khi không dùng symlink.
+Đã có thư mục `tb4_lab04` của bài trước: đổi tên nó (`mv tb4_lab04 ~/tb4_lab04_bai5`) rồi giải nén bản này vào,
+xoá `build/tb4_lab04 install/tb4_lab04` và build lại.
 
-Đã có bản cũ của dự án (bài tuần trước) – thay bằng bản này nhưng **giữ bản đồ của bạn**:
-
-```bash
-cd ~/workspaces/tb4_gazebo/src
-cp -a tb4_lab04/maps /tmp/tb4_maps_backup
-mv tb4_lab04 ~/tb4_lab04_old_$(date +%Y%m%d_%H%M%S)
-tar -xzf ~/Downloads/tb4_lab04.tar.gz -C ~/workspaces/tb4_gazebo/src
-cp -a /tmp/tb4_maps_backup/map.yaml /tmp/tb4_maps_backup/map.pgm tb4_lab04/maps/
-cd ~/workspaces/tb4_gazebo && rm -rf build/tb4_lab04 install/tb4_lab04
-colcon build --symlink-install --packages-select tb4_lab04 && source install/setup.bash
-```
-
-> Bản đồ trong repo là bản đồ world `maze` đã nộp tuần trước. Nếu bạn thay bằng bản đồ khác, **phải** chạy lại
-> `check_goals.py` (mục 3) – goal mẫu có thể rơi vào tường của bản đồ mới.
-
-Mỗi terminal mới (hoặc thêm vào cuối `~/.bashrc`):
+Mỗi terminal mới (hoặc thêm vào `~/.bashrc`):
 
 ```bash
 source /opt/ros/humble/setup.bash
@@ -121,337 +114,251 @@ source ~/workspaces/tb4_gazebo/install/setup.bash
 export ROS_LOCALHOST_ONLY=1
 ```
 
-### 1.3. Python cho YOLO
-
-**Cách nhanh nhất (khuyến nghị): một lệnh cài hết và tự kiểm tra** (chạy trong thư mục dự án, KHÔNG ở môi trường conda):
-
-```bash
-bash scripts/install_yolo_deps.sh          # máy có GPU NVIDIA: thêm --gpu
-```
-
-Script cài gói apt cần thiết, ghim `numpy<2` + `opencv-python<4.11`, cài PyTorch (CPU), ultralytics, tải sẵn `yolo11n.pt`, rồi in `[PASS]/[FAIL]` cho numpy, cv2, torch, ultralytics, cv_bridge, vision_msgs. Cài thủ công từng bước:
-
-```bash
-# (Khuyến nghị cho máy KHÔNG có GPU NVIDIA) PyTorch bản CPU: ~200 MB thay vì ~3 GB bản CUDA
-pip3 install --user torch torchvision --index-url https://download.pytorch.org/whl/cpu
-
-# ultralytics + GHIM NumPy 1.x để không làm hỏng cv_bridge của ROS 2 Humble
-pip3 install --user "numpy<2" "opencv-python<4.11" ultralytics
-```
-
-Đề ghi `pip install ultralytics opencv-python`: lệnh đó (năm 2026) cài `opencv-python` 4.12+ **bắt buộc NumPy 2.x**,
-mà `cv_bridge` (apt) được biên dịch với NumPy 1.x → lỗi `_ARRAY_API not found` / `numpy.core.multiarray failed to
-import` khi node YOLO chuyển ảnh. Hai ràng buộc `"numpy<2" "opencv-python<4.11"` tránh đúng lỗi này (đã kiểm:
-NumPy 1.26.4, OpenCV 4.10, ultralytics 8.4, PyTorch 2.x trên Ubuntu 22.04 / Python 3.10).
-
-Đã lỡ cài NumPy 2: chạy lại dòng `pip3 install --user "numpy<2" "opencv-python<4.11" ultralytics`.
-
-### 1.4. Tải trước model (1 lần, cần Internet)
-
-```bash
-ros2 run tb4_lab04 spawn_objects.py --download-only     # 7 model Gazebo Fuel -> ~/.ignition/fuel
-python3 -c "from ultralytics import YOLO; YOLO('$HOME/.cache/tb4_lab04/models/yolo11n.pt')"   # ~5 MB
-```
-
-(Bỏ qua bước này cũng được: lần chạy đầu tự tải, chỉ chậm hơn.)
-
-### 1.5. Kiểm tra môi trường
-
-```bash
-ros2 run tb4_lab04 doctor.sh
-```
-
-Phải kết thúc bằng `Kết luận: không có lỗi chặn`. Mục 11 kiểm tra NumPy/OpenCV/cv_bridge/ultralytics, mục 12 kiểm tra
-model vật thể đã tải chưa. Mỗi `[FAIL]` có kèm lệnh sửa.
-
----
-
-## 2. Phần 1 – Simulation, nạp bản đồ, Localization
-
-### 2.1. Khởi chạy
-
-**Terminal 1:**
-
-```bash
-ros2 run tb4_lab04 kill_sim.sh
-ros2 launch tb4_lab04 navigation.launch.py
-```
-
-Launch làm theo thứ tự (log có tiền tố `[tb4_lab04]`):
-
-1. Gazebo + TurtleBot 4 trong world `maze` (đúng world, đúng vị trí spawn như lúc làm bản đồ), robot đỗ trong dock;
-2. chờ mô phỏng **thật sự chạy** (`wait_for_sim.py`: có `/clock` và `/odom`);
-3. **spawn vật thể** (`spawn_objects.py`, `config/objects.yaml`) – log `[spawn_objects] + person_1 ...`,
-   `Đã thêm 7/7 vật thể`;
-4. sau 2 s: `map_server` nạp `maps/map.yaml` + **AMCL** (`config/localization.yaml`) – AMCL tự đặt initial pose
-   (0, 0, 0) = chỗ robot đỗ;
-5. sau 8 s: **Nav2** (`config/nav2.yaml`) – panel *Navigation 2* trên RViz2: `Navigation: active`,
-   `Localization: active`.
-
-Tuỳ chọn: `software_render:=true` (WSL2 / driver đồ hoạ lỗi), `spawn_objects:=false` (world trống),
-`map:=/duong/dan/map.yaml`, `use_rviz:=false`.
-
-### 2.2. Kiểm tra initial pose: LiDAR phải trùng tường
-
-Trên RViz2 (Fixed Frame `map`):
-
-- bản đồ của tuần trước (xám/đen/trắng);
-- robot nằm đúng chỗ dock (gốc toạ độ), mũi tên hạt AMCL (*Amcl Particle Swarm*) tụ quanh robot;
-- **chấm đỏ LiDAR trùng khít các bức tường đen**. Các cụm chấm không trùng tường là vật thể mới thêm (người,
-  xe…) – chúng không có trên bản đồ tuần trước, đó là bình thường.
-
-Kiểm tra định lượng (**Terminal 2**):
-
-```bash
-ros2 run tb4_lab04 localization_check.py
-```
-
-```
-Scan khớp tường:  96.1 % (330 tia, lệch trung vị 0.000 m) | robot (map) (0.00, 0.00, 0°)
-...
-============ KIỂM TRA LOCALIZATION ============
-Tỉ lệ tia khớp    : TB 96.1 %, thấp nhất 96.1 %
-=> ĐẠT: LiDAR trùng tường của bản đồ – initial pose / AMCL đúng
-```
-
-(Số liệu từ lần kiểm thử của tác giả – trên Gazebo thật tỉ lệ thường thấp hơn vài % vì nhiễu LiDAR và vật thể mới.)
-
-So với vị trí **thật** trong Gazebo (`/sim_ground_truth_pose`): `ros2 run tb4_lab04 compare_pose.py` (Ctrl+C để xem
-tổng kết; `ĐẠT` khi sai số trung bình ≤ 0.25 m).
-
-Nếu LiDAR lệch tường (spawn khác chỗ, AMCL nhảy sai): nút **2D Pose Estimate** trên RViz2 → click vào vị trí thật
-của robot → kéo theo hướng robot đang nhìn → chạy lại `localization_check.py`.
-
----
-
-## 3. Phần 2 – Khảo sát toạ độ mục tiêu
-
-Goal nằm trong `config/goals.yaml` (frame `map`, mét, yaw tính bằng radian; có thể ghi `yaw_deg`). Repo có sẵn 3
-goal ở 3 khu vực khác nhau của mê cung, mỗi goal quay mặt về phía vật thể để YOLO nhận diện khi tới nơi:
-
-| Goal | x (m) | y (m) | yaw | Khu vực | Camera nhìn thấy khi tới |
-|---|---|---|---|---|---|
-| G1 | −5.50 | 5.75 | 2.63 rad (151°) | phòng trên-trái | xe hơi (`car_1`, ~3.5 m) |
-| G2 | −6.00 | −2.60 | −1.57 rad (−90°) | khu dưới-trái | người (`person_2`), ghế (`chair_1`) |
-| G3 | 5.30 | −2.00 | 0 rad (0°) | hành lang phải | trụ cứu hoả, người (`person_3`), bình chữa cháy |
-
-**Lấy toạ độ của bạn** (đề yêu cầu tự khảo sát – nên làm và quay vào video). Terminal 1 vẫn chạy
-`navigation.launch.py`; **Terminal 2:**
-
-```bash
-ros2 run tb4_lab04 goal_recorder.py
-```
-
-- Cách 1 (đề gợi ý): RViz2 → nút **Publish Point** → click lên ô trắng của bản đồ. Terminal in
-  `Goal 1: x=-5.48  y=5.80  yaw=...` (yaw = hướng từ điểm trước tới điểm này; sửa lại nếu muốn robot nhìn về vật thể).
-  Xem topic thô: `ros2 topic echo /clicked_point`.
-- Cách 2 (đề gợi ý): nhấn **Enter** → ghi pose hiện tại của robot từ `/amcl_pose` (có yaw).
-  Xem topic thô: `ros2 topic echo /amcl_pose`.
-- `u` = xoá điểm cuối, `w` = ghi file, `q` = ghi file và thoát. File: `~/tb4_results/goals_recorded.yaml`; khi thoát
-  terminal in sẵn đoạn YAML – dán vào `config/goals.yaml`.
-
-**Kiểm tra goal trước khi chạy** (không cần mô phỏng):
-
-```bash
-ros2 run tb4_lab04 check_goals.py --plot
-```
-
-```
-#           x        y    yaw° cách tường   quãng đg  tên
-G1      -5.50     5.75     151     0.75 m      8.0 m  Goal 1 - phong tren-trai (xe hoi)
-G2      -6.00    -2.60     -90     1.21 m      9.3 m  Goal 2 - khu duoi-trai (nguoi + ghe)
-G3       5.30    -2.00       0     1.25 m     12.1 m  Goal 3 - hanh lang phai (...)
-Camera tại mỗi goal (FOV 60°):
-  G1: car_1 3.5 m +5° (giữa khung)
-  G2: person_2 3.0 m +0° (giữa khung); chair_1 2.9 m +25° (giữa khung)
-  G3: fire_hydrant_1 3.4 m +17° (giữa khung); person_3 3.7 m -9° (giữa khung); fire_extinguisher_1 3.3 m -23° ...
-KẾT LUẬN: các goal HỢP LỆ.
-Đã vẽ: /home/<bạn>/tb4_results/goals_map.png
-```
-
-Script báo **LỖI** nếu goal nằm trên tường / vùng xám / ngoài bản đồ, cách vật cản < bán kính robot, hoặc không có
-đường đi đủ rộng từ goal trước (tính trên bản đồ + footprint vật thể); **CẢNH BÁO** nếu cách tường < 0.45 m (Nav2 hay
-báo `Failed to make progress`). Ảnh `goals_map.png` (bản đồ + goal + hướng + vùng nhìn của camera + vật thể) dùng
-cho báo cáo.
-
----
-
-## 4. Phần 3 – Navigation tự động bằng code
-
-**Terminal 1** vẫn chạy `navigation.launch.py` (Nav2 đã `active`). **Không** chạy teleop. **Terminal 3:**
-
-```bash
-ros2 run tb4_lab04 waypoint_navigator.py
-```
-
-Node (`scripts/waypoint_navigator.py`, lớp con của `nav2_simple_commander.BasicNavigator`) tự làm:
-
-```
-[1/5] Chờ AMCL và Nav2 (bt_navigator) ở trạng thái active ...
-  amcl : active
-[2/5] Initial pose cho AMCL
-  Đặt initial pose (0.00, 0.00, yaw 0.00) – robot đang ở trong dock = đúng điểm spawn của lúc làm bản đồ
-  AMCL: (0.00, 0.00, 0°)  độ lệch chuẩn x=0.48 m y=0.49 m yaw=15°
-  bt_navigator : active
-[3/5] Rời dock
-Undock ... (robot lùi ra khỏi dock rồi quay 180°)
-Undock thành công (is_docked = False)
-[4/5] Bắt đầu đi qua 3 goal – KHÔNG điều khiển tay từ lúc này
-=== G1 / 3: Goal 1 - phong tren-trai (xe hoi) -> (-5.50, 5.75, 151°)
-  -> G1: còn 6.12 m | ETA ~24 s | đã đi 9 s | recovery 0
-<<< G1: TỚI NƠI sau 38.5 s, đi 8.0 m, sai số 0.23 m / 0°
-    dừng 2 s tại G1 (YOLO quan sát)
-=== G2 / 3 ...
-[5/5] TỔNG KẾT
-#    kết quả    thời gian  quãng đg sai số xy sai số yaw thử  tên
-G1   SUCCEEDED     38.5s     8.0 m    0.23 m        0°    1  Phòng trên-trái (xe hơi)
-G2   SUCCEEDED     45.0s    11.6 m    0.21 m       14°    1  Khu dưới-trái (người, ghế)
-G3   SUCCEEDED     46.9s    11.6 m    0.23 m       14°    1  Hành lang phải (trụ cứu hoả, người, bình chữa cháy)
-Goal thành công: 3/3
-=> ĐẠT: robot tự đi qua 3 goal liên tiếp
-[tb4_lab04] Đã lưu kết quả: ~/tb4_results/nav_<thời_gian>/run.json, summary.csv
-```
-
-(Số liệu ở trên lấy từ lần kiểm thử của tác giả, thời gian tính theo giờ mô phỏng; trên máy bạn sẽ khác tuỳ real-time factor của Gazebo. Sai số dừng ~0.2 m / ≤ 14° là dung sai mặc định của Nav2: 0.25 m / 0.25 rad.)
-
-Chi tiết hành vi:
-
-- **Initial pose** chỉ được đặt khi robot **còn trong dock** (chắc chắn đang ở điểm spawn). Chạy node lần 2 khi
-  robot đã ở giữa mê cung thì node **giữ** ước lượng của AMCL (đặt lại (0,0,0) lúc đó sẽ làm AMCL sai). Ép buộc:
-  `-p initial_pose_mode:=always|never`. Initial pose được gửi kèm hiệp phương sai như nút 2D Pose Estimate (bản
-  gốc `setInitialPose` của nav2_simple_commander gửi hiệp phương sai 0 → mọi hạt AMCL trùng một điểm).
-- Goal thất bại (`ABORTED`) → xoá costmap, thử lại 1 lần (`max_retries`); quá `goal_timeout` (300 s mô phỏng)
-  → huỷ, chuyển goal tiếp theo.
-- Trên RViz2: mũi tên + nhãn **G1, G2, G3** (topic `/nav_goals/markers`): vàng = chờ, xanh dương = đang đi,
-  xanh lá = tới nơi, đỏ = thất bại. Đường xanh lá = global plan Nav2 vừa lập (`/plan`).
-- **Ctrl+C**: node huỷ goal đang chạy (robot dừng) rồi mới thoát.
-- Tuỳ chọn: `-p look_around:=true` (xoay 360° tại mỗi goal cho camera quét), `-p return_home:=true`
-  (về chỗ sau undock), `-p loops:=2`, `-p goals_file:=/duong/dan/goals.yaml`.
-
-Theo dõi độc lập (bằng chứng không điều khiển tay, không va chạm) – **Terminal 4** (tuỳ chọn):
-`ros2 run tb4_lab04 nav_monitor.py` → Ctrl+C sau khi xong: `ĐẠT (>= 3 goal thành công, không va chạm)`.
-
-**Ảnh cho báo cáo** – bản đồ + goal + đường Nav2 đã lập + quỹ đạo thật của robot (+ vị trí robot lúc YOLO phát hiện
-vật thể):
-
-```bash
-ros2 run tb4_lab04 check_goals.py --plot ~/tb4_results/map_run.png \
-    --run ~/tb4_results/nav_<thời_gian>/run.json \
-    --detections ~/tb4_results/yolo_<thời_gian>/detections.csv
-```
-
----
-
-## 5. Phần 4 – Nhận diện vật thể bằng YOLO
-
-**Terminal 2** (chạy song song khi robot di chuyển – nên bật **trước** `waypoint_navigator.py`):
-
-```bash
-ros2 launch tb4_lab04 yolo.launch.py
-# hoặc: ros2 run tb4_lab04 yolo_detector.py
-```
-
-- Cửa sổ OpenCV **"YOLO - camera TurtleBot 4"** (phóng ×2): bounding box, `tên_lớp độ_tự_tin`, FPS, vị trí robot.
-- RViz2: panel **YOLO** (nhóm *Camera*) hiển thị `/yolo/image_annotated`.
-- Terminal:
-
-```
-[yolo_detector]: Model sẵn sàng sau 3.0 s: 80 lớp, thiết bị cpu, 2 luồng CPU, ~120 ms/ảnh
-[yolo_detector]: *** PHÁT HIỆN MỚI: person (conf 0.86) – robot tại (-5.95, -2.71)
-[yolo_detector]: [t=212.4s | robot (-5.95, -2.71)] 2 vật thể: person 0.86 [139,30,201,231], chair 0.52 [...]
-...
-================ TỔNG KẾT YOLO ================
-lớp                số khung  conf max lần đầu (s)  robot lúc thấy lần đầu (map)
-car                      41      0.81      118.2  (-4.80, 5.41)
-person                  133      0.90      150.3  (-3.10, 1.62)
-...
-Kết quả: ~/tb4_results/yolo_<thời_gian> (detections.csv, first_*.jpg, best_*.jpg)
-```
-
-- `first_<lớp>.jpg` / `best_<lớp>.jpg`: khung hình đầu tiên / tự tin nhất của mỗi lớp – dùng làm ảnh báo cáo.
-- `/yolo/detections` (`vision_msgs/msg/Detection2DArray`) cho node khác dùng.
-
-Model và tham số (`config/yolo.yaml`, hoặc tham số launch):
-
-| Muốn | Lệnh |
-|---|---|
-| YOLOv8 thay YOLO11 | `ros2 launch tb4_lab04 yolo.launch.py yolo_model:=yolov8n.pt` |
-| Chính xác hơn (chậm hơn) | `yolo_model:=yolo11s.pt` |
-| Nhận "fire extinguisher" (COCO không có lớp này) | `yolo_model:=yolov8s-worldv2.pt` (YOLO-World, lớp ở `world_classes`; lần đầu tự cài gói CLIP – cần Internet) |
-| Máy yếu | sửa `config/yolo.yaml`: `imgsz: 320`, `max_rate: 3.0` |
-| GPU NVIDIA | `device:=0` |
-
-Về chất lượng nhận diện trong mô phỏng (nói thẳng): camera mô phỏng chỉ 320×240, model Gazebo là mô hình 3D đơn
-giản, nên YOLO nhận **người** và **xe hơi** ổn định nhất; ghế, trụ cứu hoả có thể độ tự tin thấp hoặc lúc có lúc
-không; **bình chữa cháy không thuộc 80 lớp COCO** – YOLO11/YOLOv8 chuẩn sẽ không nhận ra (có thể nhận nhầm thành
-`bottle`), cần YOLO-World. Ghi đúng điều này trong báo cáo thay vì cố ép kết quả.
-
----
-
-## 6. Chạy tất cả bằng một lệnh
-
-```bash
-ros2 run tb4_lab04 kill_sim.sh
-ros2 launch tb4_lab04 demo.launch.py
-```
-
-= `navigation.launch.py` + `yolo.launch.py` + (sau 25 s) `waypoint_navigator.py`. Tham số của cả ba dùng chung,
-ví dụ `software_render:=true yolo_model:=yolov8n.pt run_navigator:=false`. Để quay video nên dùng nhiều terminal
-(mục 7) – người xem thấy rõ từng bước; `demo.launch.py` tiện để chạy thử.
-
----
-
-## 7. Kịch bản quay video demo
-
-Quay toàn màn hình (OBS Studio). Bố trí: RViz2 (lớn) + Gazebo + cửa sổ YOLO + các terminal.
-
-1. **Load bản đồ + localization (~1.5 phút)**: `kill_sim.sh`, `ros2 launch tb4_lab04 navigation.launch.py`;
-   Gazebo có người/xe/ghế…; RViz2 hiện bản đồ tuần trước, robot ở dock, hạt AMCL tụ quanh robot, **LiDAR trùng
-   tường** (phóng to); `localization_check.py` → `ĐẠT`; (tuỳ chọn) so vị trí robot Gazebo ↔ RViz2.
-2. **Toạ độ goal (~1 phút)**: `goal_recorder.py` + Publish Point vài điểm; mở `config/goals.yaml`;
-   `check_goals.py --plot` + mở ảnh.
-3. **YOLO**: `ros2 launch tb4_lab04 yolo.launch.py` – cửa sổ YOLO mở ra.
-4. **Navigation tự động**: `ros2 run tb4_lab04 waypoint_navigator.py`; **bỏ tay khỏi bàn phím/chuột**. Quay cho
-   thấy: robot tự undock, đường xanh (global plan) trên RViz2, robot đi G1 → G2 → G3, marker đổi màu, cửa sổ YOLO
-   vẽ bbox khi gặp người/xe…, terminal in `PHÁT HIỆN MỚI`. Có thể tua nhanh đoạn di chuyển dài.
-5. **Kết quả**: bảng `TỔNG KẾT` (3/3 SUCCEEDED, `ĐẠT`), Ctrl+C YOLO → bảng tổng kết YOLO; mở `best_person.jpg`.
-
----
-
-## 8. Nộp bài: GitHub, video, báo cáo PDF
-
-### 8.1. GitHub (Public)
-
-Nên tạo repo mới cho bài này (vd. `tb4-nav2-yolo`) để không lẫn với repo tuần trước:
+### 1.3. OpenCV + MediaPipe
 
 ```bash
 cd ~/workspaces/tb4_gazebo/src/tb4_lab04
-git add -A
-git status                 # phải có maps/map.yaml, maps/map.pgm, config/goals.yaml, scripts/*.py, launch/*.py
-git commit -m "TurtleBot 4: AMCL + Nav2 waypoint navigator + YOLO detector"
-git remote set-url origin https://github.com/<ten-ban>/<repo-moi>.git    # hoặc: git remote add origin ...
+bash scripts/install_gesture_deps.sh
+```
+
+Script cài `mediapipe==0.10.21`, `numpy<2`, `opencv-python<4.11`, `opencv-contrib-python<4.11` (cả hai OpenCV
+cùng bản 4.10 vì chúng ghi chung thư mục `cv2`), rồi in `[PASS]/[FAIL]` cho NumPy, OpenCV (có GUI), MediaPipe
+(chạy thử model), cv_bridge, và liệt kê webcam. Cài tay:
+
+```bash
+pip3 install --user "mediapipe==0.10.21" "numpy<2" "opencv-python<4.11" "opencv-contrib-python<4.11"
+```
+
+Model `models/gesture_recognizer.task` (MediaPipe, float16, 8,4 MB, Apache 2.0) đã có sẵn trong repo – không cần
+tải. Thiếu file thì node tự tải từ
+`https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task`
+về `~/.cache/tb4_lab04/models/`.
+
+---
+
+## 2. Phần 1 – Simulation, kiểm tra /cmd_vel, webcam
+
+**Terminal 1** – Gazebo + TurtleBot 4 trong world **`gesture_arena`** (sân phẳng 9 m × 9 m, tường thấp bao
+quanh, không vật cản bên trong – `worlds/gesture_arena.sdf`):
+
+```bash
+ros2 run tb4_lab04 kill_sim.sh
+ros2 launch tb4_lab04 gesture_sim.launch.py
+#   tuỳ chọn: software_render:=true (WSL2/driver lỗi), use_rviz:=true, world:=maze (world bài trước)
+```
+
+Robot xuất hiện trong dock ở gốc toạ độ. (Thời lượng các bước của `check_cmd_vel.py` tính theo giờ mô phỏng nên
+máy chậm vẫn đo đúng – số liệu dưới đây là lần chạy thật trong môi trường kiểm thử.) Vòng tròn màu xanh nhạt trên sàn (bán kính 1,6 m) đánh dấu vùng làm
+việc của các hành vi cử chỉ – chỉ để nhìn, không có va chạm.
+
+**Terminal 2** – kiểm tra robot nhận `/cmd_vel` (tự undock nếu đang ở dock, quay trái/phải, tiến/lùi, đo bằng
+`/odom`):
+
+```bash
+ros2 run tb4_lab04 check_cmd_vel.py
+```
+
+```
+Robot đang ở dock -> /undock
+Undock xong
+Pose trước: x=-0.35 y=-0.00 yaw=-169°
+/cmd_vel: quay trái 0.5 rad/s, 3 s
+  -> đã quay 86°
+/cmd_vel: quay phải 0.5 rad/s, 3 s
+/cmd_vel: tiến 0.1 m/s, 2 s
+  -> đã đi 0.20 m
+/cmd_vel: lùi 0.1 m/s, 2 s
+Pose sau: x=-0.35 y=0.00 yaw=-169° (lệch 0.01 m so với trước)
+KẾT QUẢ: ĐẠT – robot nhận lệnh /cmd_vel
+```
+
+Kiểm tra bằng lệnh ROS thuần (đưa vào video/báo cáo cũng được):
+
+```bash
+ros2 topic info /cmd_vel                                   # Subscription count >= 1
+ros2 topic pub -r 10 -t 30 /cmd_vel geometry_msgs/msg/Twist "{angular: {z: 0.5}}"
+ros2 topic echo /odom --field twist.twist                  # angular.z ~ 0.5
+```
+
+**Webcam bằng OpenCV** (không cần ROS chạy):
+
+```bash
+ros2 run tb4_lab04 webcam_test.py          # cửa sổ hình webcam + độ phân giải + FPS; q để thoát
+ros2 run tb4_lab04 webcam_test.py --list   # dò camera 0..3
+ros2 run tb4_lab04 webcam_test.py 1        # webcam USB
+```
+
+---
+
+## 3. Phần 2 – Node nhận diện cử chỉ
+
+```bash
+ros2 launch tb4_lab04 gesture.launch.py run_behavior:=false     # chỉ nhận diện
+ros2 topic echo /detected_gesture                               # terminal khác
+```
+
+Cửa sổ **“Gesture Recognition - TurtleBot 4”** (ảnh đã lật gương):
+
+- 21 landmark bàn tay + khung xương;
+- dòng 1 `Khung: Thumb Up (ngon cai) 87%` – cử chỉ MediaPipe trả về ở khung hiện tại + **độ tin cậy**
+  (thanh `conf`);
+- dòng 2 `ON DINH -> /detected_gesture: Thumb_Up` – kết quả đã lọc nhiễu, đúng giá trị đang publish
+  (thanh `vote` = tỉ lệ khung đồng thuận);
+- FPS, số nhịp vẫy `wave n/3`, bảng chú giải cử chỉ → hành vi;
+- dải dưới: trạng thái robot (`IDLE`, `SELECTED`, `EXECUTING (45%)`...) nhận từ `/robot_behavior/state`.
+
+Terminal in mỗi lần nhãn ổn định đổi: `Cử chỉ ổn định: Victory (khung: Victory 0.91)`.
+
+### 3.1. Cách hoạt động (`scripts/gesture_recognition_node.py`)
+
+1. **OpenCV** đọc webcam ở luồng riêng (`cv2.VideoCapture`, V4L2, 640×480, buffer 1 khung – luôn lấy khung mới
+   nhất nên không trễ dồn), lật gương.
+2. **MediaPipe Gesture Recognizer** (Tasks API, chế độ `VIDEO`): mô hình phát hiện lòng bàn tay → mô hình
+   21 landmark 3D → bộ phân loại cử chỉ (7 lớp: `Closed_Fist, Open_Palm, Pointing_Up, Thumb_Down, Thumb_Up,
+   Victory, ILoveYou` + `None`) trả **tên + độ tin cậy**. Chế độ VIDEO dùng lại vị trí tay của khung trước
+   (tracking) nên nhanh và ổn định hơn chạy từng ảnh rời.
+3. **Vẫy tay** (model gốc không có lớp này) – `WaveDetector`: lấy hoành độ tâm lòng bàn tay ở các khung có
+   bàn tay xoè (`Open_Palm` hoặc ≥ 4 ngón duỗi); trong 1,5 s gần nhất phải có ≥ 3 nhịp qua lại, mỗi nhịp dài
+   ≥ 6 % bề ngang ảnh. Tay đứng yên / rung nhẹ không thành `Wave`.
+4. **Ngưỡng tin cậy**: cử chỉ có điểm < `min_score` (0,55) coi như `None`.
+5. **Chống nhiễu** – `GestureStabilizer` (bỏ phiếu theo thời gian): nhãn L chỉ được publish khi trong `hold`
+   giây gần nhất ≥ 70 % khung là L (`hold` = 0,5 s cho chọn/xác nhận/huỷ, 0,2 s cho `Open_Palm` để dừng nhanh,
+   0,15 s cho `Wave`, 0,4 s cho `None`). 1–2 khung nhận nhầm không làm đổi kết quả.
+6. **Publish** nhãn ổn định lên `/detected_gesture` (`std_msgs/String`) ở **mỗi khung** (~30 Hz) – vừa là kết
+   quả, vừa là “nhịp tim” cho watchdog của node hành vi. Chi tiết từng khung (JSON) ở `/detected_gesture/info`.
+7. Camera lỗi / rút webcam: KHÔNG publish (→ robot dừng), thử mở lại mỗi 2 s.
+
+Nguồn ảnh khác (thử nghiệm): `camera_source:=1` (webcam USB), `camera_source:=/dev/video2`,
+`camera_source:=~/video.mp4` (phát đúng nhịp thời gian thực), `camera_source:=~/thu_muc_anh` (mỗi ảnh 2 s).
+
+---
+
+## 4. Phần 3 – Node điều khiển hành vi
+
+```bash
+ros2 launch tb4_lab04 gesture.launch.py          # cả 2 node (Terminal 1 đang chạy gesture_sim)
+```
+
+### 4.1. Máy trạng thái (`gesture_logic.BehaviorStateMachine`)
+
+```
+ WAITING --(tin nhắn đầu)--> IDLE <-------------------------------------------+
+ SETUP (undock + ra giữa sân) --xong/huỷ--> IDLE                              |
+ IDLE/STOPPED --Wave | Pointing_Up | Victory--> SELECTED(hành vi)             |
+ SELECTED --Thumb_Up--> EXECUTING --hoàn thành--> IDLE (xoá lựa chọn) --------+
+ SELECTED --Closed_Fist / quá 15 s không xác nhận--> IDLE
+ EXECUTING --Open_Palm / vật cản / kẹt--> STOPPED (giữ lựa chọn) --Thumb_Up--> EXECUTING (chạy lại từ đầu)
+ EXECUTING/STOPPED --Closed_Fist--> IDLE
+ mọi trạng thái --không có /detected_gesture > 1 s--> SIGNAL_LOST (dừng) --có tín hiệu lại--> IDLE
+```
+
+### 4.2. Yêu cầu của đề → cách đáp ứng
+
+| Yêu cầu | Cách làm |
+|---|---|
+| Chỉ thực hiện sau cử chỉ xác nhận | `Pointing_Up`/`Victory`/`Wave` chỉ **chọn**; `Thumb_Up` mới chạy. Ngón cái khi chưa chọn → bỏ qua. Chạy xong → xoá lựa chọn (muốn chạy lại phải chọn + xác nhận lại). Lựa chọn hết hạn sau 15 s |
+| Không dùng bàn phím | mọi lệnh đi qua `/detected_gesture`; node không đọc bàn phím; undock tự động |
+| Tránh nhiễu kích hoạt liên tục | (1) ngưỡng tin cậy 0,55; (2) bỏ phiếu theo thời gian ở node nhận diện; (3) node hành vi **chỉ bắt sườn** (nhãn đổi) – giữ ngón cái 10 s vẫn chỉ 1 lệnh; (4) **cooldown** 1 s cho mỗi cử chỉ; (5) đang chạy thì bỏ qua cử chỉ chọn/xác nhận |
+| Dừng khi có tín hiệu dừng | `Open_Palm` (hold chỉ 0,2 s, không cooldown, ưu tiên cao nhất) → gửi `Twist` 0 ngay + 5 lần liên tiếp, huỷ hành vi |
+| Dừng khi mất tín hiệu | watchdog: > 1 s không có `/detected_gesture` → dừng, huỷ hành vi (`SIGNAL_LOST`); `Ctrl+C` node hành vi → gửi `Twist` 0 trước khi thoát |
+| Khu vực đủ rộng, không va chạm | world `gesture_arena` 9 m × 9 m trống; robot undock rồi chạy 1 m ra giữa sân; mọi hành vi nằm trong bán kính 1,05 m quanh điểm bắt đầu và kết thúc gần đúng chỗ cũ (đối xứng) → cách tường ≥ 2,5 m; thêm lớp an toàn LiDAR: vật cản < 0,40 m theo hướng đang chạy → dừng; robot kẹt (ra lệnh mà odom không đổi 4 s) → dừng |
+
+### 4.3. Hành vi (đo bằng `/odom`, không phải hẹn giờ)
+
+| Hành vi | Chuỗi chuyển động | Thời gian danh định |
+|---|---|---|
+| `greet` (chào) | quay trái 0,6 rad → phải 1,2 → trái 1,2 → phải 1,2 → trái 0,6 (1 rad/s) – về đúng hướng ban đầu | ~5 s |
+| `forward_back` | 4 × (tiến 0,35 m, nghỉ 0,3 s, lùi 0,35 m), 0,2 m/s | ~20 s |
+| `circle` | v = 0,15 m/s, ω = 0,3 rad/s (r = 0,5 m) tới khi yaw tích luỹ đủ 360° | ~21 s |
+
+`SegmentRunner` tăng tốc dần (0,5 m/s², 2 rad/s²), giảm tốc gần đích (v ≤ √(2·a·s), có bù trễ đáp ứng 0,15 s)
+nên không vọt đích; không có `/odom` thì quy đổi theo thời gian (kém chính xác hơn, có cảnh báo).
+
+---
+
+## 5. Chạy demo và kịch bản quay video
+
+```bash
+# Terminal 1
+ros2 run tb4_lab04 kill_sim.sh
+ros2 launch tb4_lab04 gesture_sim.launch.py
+# Terminal 2 (khi Gazebo đã lên)
+ros2 launch tb4_lab04 gesture.launch.py
+# Terminal 3 (tuỳ chọn – cho người xem thấy topic)
+ros2 topic echo /detected_gesture
+```
+
+Hoặc một lệnh: `ros2 launch tb4_lab04 gesture_demo.launch.py` (node cử chỉ tự bật khi Gazebo sẵn sàng).
+
+**Kịch bản video** (OBS Studio, quay toàn màn hình: Gazebo bên trái, cửa sổ webcam bên phải, terminal nhỏ
+phía dưới; **không chạm bàn phím** sau khi chạy lệnh Terminal 2):
+
+1. *Phần 1 (~1 phút)*: Gazebo + robot trong dock; `check_cmd_vel.py` → robot quay, tiến, lùi → `ĐẠT`;
+   `webcam_test.py` vài giây.
+2. Chạy `gesture.launch.py`, chờ robot tự undock + ra giữa sân (`Robot: IDLE`).
+3. Lần lượt **6 cử chỉ** (mỗi cử chỉ giữ ~1 s, hạ tay giữa các cử chỉ):
+   - **Vẫy tay** → `SELECTED greet` → **ngón cái** → robot xoay trái–phải.
+   - **1 ngón** → `SELECTED forward_back` → **ngón cái** → tiến–lùi 4 lần.
+   - **2 ngón** → `SELECTED circle` → **ngón cái** → đi vòng tròn; giữa chừng **xoè tay** → robot dừng ngay
+     (`STOPPED`) → **ngón cái** → chạy lại → để chạy hết vòng.
+   - **1 ngón** → ngón cái → robot tiến–lùi → **nắm tay** → dừng + về `IDLE`.
+   - Chứng minh chống nhiễu: giữ ngón cái lâu khi chưa chọn → robot không chạy (`Chua chon hanh vi`).
+   - Chứng minh mất tín hiệu: chọn + xác nhận tiến–lùi rồi **đóng cửa sổ webcam** (hoặc Ctrl+C node nhận diện
+     ở terminal khác) → robot dừng sau ~1 s, log `MAT TIN HIEU`.
+4. Kết thúc: `ros2 run tb4_lab04 plot_gesture_run.py` → mở ảnh quỹ đạo.
+
+---
+
+## 6. Thử không cần webcam
+
+Kiểm tra node hành vi + Gazebo bằng chuỗi cử chỉ giả (chỉ để kiểm thử – video nộp bài phải dùng webcam):
+
+```bash
+ros2 launch tb4_lab04 gesture.launch.py run_recognition:=false
+ros2 run tb4_lab04 gesture_sequence.py --ros-args -p preset:=all     # đủ 6 cử chỉ, ~2,5 phút
+ros2 run tb4_lab04 gesture_sequence.py --ros-args -p sequence:="Victory:1.5,None:1,Thumb_Up:1.5,None:30"
+```
+
+Kiểm tra node nhận diện bằng video quay sẵn: `ros2 run tb4_lab04 gesture_recognition_node.py --ros-args -p camera_source:=~/thu.mp4`.
+
+Unit test (không cần ROS): `python3 test/test_gesture_logic.py`.
+
+---
+
+## 7. Kết quả, log, ảnh quỹ đạo
+
+`robot_behavior_node` ghi `~/tb4_results/gesture_<thời_gian>/`:
+- `events.csv` – mọi cử chỉ ổn định, lệnh `start`/`stop`, trạng thái;
+- `odom.csv` – quỹ đạo 10 Hz kèm hành vi đang chạy.
+
+```bash
+ros2 run tb4_lab04 plot_gesture_run.py           # lần chạy mới nhất -> trajectory.png + bảng sự kiện
+```
+
+---
+
+## 8. Nộp bài: GitHub, Google Drive, PDF
+
+**GitHub (Public)** – nên tạo repo mới cho bài này:
+
+```bash
+cd ~/workspaces/tb4_gazebo/src/tb4_lab04
+git add -A && git commit -m "Bai 6: dieu khien TurtleBot 4 bang cu chi tay (MediaPipe)"
+git remote set-url origin https://github.com/<ten-ban>/<repo-moi>.git
 git push -u origin main
 ```
 
-Repo đã có: source code (`scripts/` – node điều hướng `waypoint_navigator.py`, node YOLO `yolo_detector.py`),
-launch (`launch/`), bản đồ (`maps/`), cấu hình (`config/`, `rviz/`), README này. `.gitignore` đã loại
-`build/ install/ log/`, file model `*.pt`, kết quả chạy.
+**Google Drive**: upload video → *Share* → *General access: Anyone with the link* (Viewer) → copy link.
 
-### 8.2. Video
-
-Google Drive → Share → General access: **Anyone with the link** (Viewer) → copy link.
-
-### 8.3. Báo cáo PDF
+**Báo cáo PDF**:
 
 ```bash
-pip3 install --user reportlab pypdf matplotlib
-cd ~/workspaces/tb4_gazebo/src/tb4_lab04
-nano docs/report_info.yaml               # link video, link GitHub, phần nhận xét
-python3 docs/report/diagrams.py          # vẽ lại sơ đồ khối (docs/report/fig/)
-python3 docs/report/build_report.py      # -> docs/report/BaoCao_Bai5_TurtleBot4_Nav2_YOLO.pdf
+pip3 install --user reportlab pypdf
+nano docs/report_info.yaml                    # link_video, link_github
+# chép ảnh chụp màn hình CỦA BẠN vào docs/report/fig_user/ (tên file: xem đầu build_report_bai6.py)
+python3 docs/report/diagrams_bai6.py          # vẽ lại sơ đồ (chỉ khi sửa)
+python3 docs/report/build_report_bai6.py      # -> docs/report/BaoCao_Bai6_TurtleBot4_Gesture.pdf
 ```
-
-Ảnh chụp màn hình dùng trong báo cáo nằm ở `docs/report/fig_user/`. Script in ra danh sách mục còn thiếu (ảnh, link).
 
 ---
 
@@ -459,162 +366,114 @@ python3 docs/report/build_report.py      # -> docs/report/BaoCao_Bai5_TurtleBot4
 
 | Triệu chứng | Nguyên nhân → cách sửa |
 |---|---|
-| `yolo_detector`: `NumPy 2.x không dùng được với cv_bridge` / `_ARRAY_API not found` / node chết với `exit code -11` (segfault) | NumPy 2.x → `pip3 install --user "numpy<2" "opencv-python<4.11"` (mục 1.3) |
-| `Không import được ultralytics/torch` | chưa cài mục 1.3 (chú ý `--user`, cùng `python3` của ROS) |
-| `ModuleNotFoundError: No module named 'rclpy'` khi `ros2 run` / đầu dòng lệnh có `(base)` | đang bật conda → `conda deactivate`, mở terminal mới, cài lại mục 1.3 nếu đã cài trong conda |
-| Cửa sổ YOLO không mở, log `Không mở được cửa sổ OpenCV` | đang dùng `opencv-python-headless` → `pip3 uninstall -y opencv-python-headless && pip3 install --user "opencv-python<4.11"`; vẫn xem được trên RViz2 (panel YOLO) |
-| `Chưa nhận ảnh nào trên /oakd/rgb/preview/image_raw` | mô phỏng chưa chạy / `ros2 topic hz /oakd/rgb/preview/image_raw`; `software_render:=true` thì camera rất chậm (vài ảnh/giây) – bình thường |
-| YOLO quá chậm, Gazebo giật | `config/yolo.yaml`: `imgsz: 320`, `max_rate: 2.0`; dùng `yolo11n.pt` |
-| Không thấy vật thể trong Gazebo, log `[spawn_objects] KHÔNG tải được` | không có Internet tới `fuel.gazebosim.org` → có mạng thì `spawn_objects.py --download-only` rồi chạy lại launch (hoặc spawn khi sim đang chạy: `ros2 run tb4_lab04 spawn_objects.py`) |
-| `[spawn_objects] ! Spawn ... thất bại` | world không phải `maze` (truyền `world:=...` giống lúc launch) hoặc vật thể đã có (chạy lại spawner 2 lần) |
-| Navigator đứng ở `Chờ amcl ... (trạng thái: chưa có node)` | Terminal 1 chưa chạy `navigation.launch.py` hoặc chưa lên xong (chờ log `Khởi động Nav2`) |
-| `Undock thất bại: status=... CANCELED` | phản xạ an toàn Create 3 / cảm biến cliff đo sai (WSL2) → không truyền `cliff_reflex:=true`; thử `software_render:=true` ([chi tiết](docs/LAB04_SLAM_README.md#82-đồ-hoạ--cảm-biến-hay-gặp-nhất-nhất-là-wsl2)) |
-| Goal `ABORTED`, log Nav2 `Failed to make progress` / `No valid path` | goal sát tường / trong vùng xám / bị vật thể chặn → `check_goals.py`, dời goal ra xa tường ≥ 0.5 m |
-| Robot đi sai hướng ngay từ đầu | initial pose sai (spawn khác chỗ / world khác) → Ctrl+C navigator, 2D Pose Estimate trên RViz2, `localization_check.py`, chạy lại navigator (nó sẽ không ghi đè vì robot đã rời dock) |
-| Chạy navigator lần 2: robot còn ở giữa mê cung | bình thường – node giữ pose AMCL, bỏ qua undock, đi lại các goal |
-| `nav_monitor.py` báo Nav2 "ĐỨNG HÌNH" | máy quá tải → `kill_sim.sh`, đóng bớt ứng dụng, giảm `max_rate` của YOLO |
-
-Lỗi cài đặt / Gazebo / đồ hoạ / WSL2 chung: [docs/LAB04_SLAM_README.md mục 8](docs/LAB04_SLAM_README.md#8-xử-lý-sự-cố).
-Gom log gửi người hỗ trợ: `ros2 run tb4_lab04 collect_debug.sh` → `~/tb4_debug_*.txt`.
+| `Không mở được camera 0` | `ls /dev/video*`; thử `camera_source:=1`; `sudo usermod -aG video $USER` rồi đăng nhập lại; tắt Zoom/Meet/Cheese; máy ảo/WSL2: chuyển webcam vào (mục 0) |
+| `Không import được MediaPipe` | chưa chạy `install_gesture_deps.sh`; đang bật conda (`conda deactivate`) |
+| `_ARRAY_API not found`, `numpy.core.multiarray failed to import`, node YOLO bài trước chết | NumPy 2 → `pip3 install --user "numpy<2" "opencv-python<4.11" "opencv-contrib-python<4.11"` |
+| Cửa sổ không mở, log `Không mở được cửa sổ OpenCV` | có `opencv-python-headless` → `pip3 uninstall -y opencv-python-headless && pip3 install --user --force-reinstall --no-deps "opencv-contrib-python<4.11"` |
+| Log `W0000 ... inference_feedback_manager`, `GPU suport is not available ... Unable to initialize EGL`, `Created TensorFlow Lite XNNPACK delegate` | bình thường – MediaPipe chạy bằng CPU (đủ nhanh, ~20–30 FPS trên laptop) |
+| `QFontDatabase: Cannot find font directory` | đã tự xử lý trong node; nếu vẫn thấy: `sudo apt install fonts-dejavu-core` (vô hại) |
+| Nhận sai / chập chờn | đủ sáng, tay cách webcam 0,4–1 m, lòng bàn tay hướng vào camera, nền không lẫn màu da; xem `conf` trên cửa sổ; tăng `hold_time` (0,7) hoặc `min_score` (0,65) trong `config/gesture.yaml` |
+| Vẫy tay không ra `Wave` | FPS trên cửa sổ phải ≥ 10 (FPS thấp thì chuyển động bị lấy mẫu thiếu – node cảnh báo `FPS thấp`); vẫy rộng hơn (≥ 1/6 bề ngang ảnh), ~1–2 lần qua lại/giây; giảm `wave_min_amplitude` 0,04 |
+| FPS thấp (< 15) dù máy rảnh | nhiều webcam chỉ đạt 30 FPS ở chế độ MJPG: `camera_fourcc: "MJPG"` trong `config/gesture.yaml`; đủ sáng (thiếu sáng webcam tự giảm FPS) |
+| Ra cử chỉ mà robot không làm gì | robot đang `SETUP`/`EXECUTING` (xem dải dưới cửa sổ); chưa chọn trước khi ngón cái; giữ nguyên cử chỉ từ trước (phải đổi cử chỉ / hạ tay); cooldown 1 s |
+| Robot dừng giữa chừng, log `MAT TIN HIEU` | node nhận diện tắt/treo, camera lỗi, máy quá tải (FPS < 2) → `max_fps: 15`, đóng bớt ứng dụng |
+| Log `VẬT CẢN cách 0.3x m` | có vật/tường gần theo hướng chạy – đúng thiết kế. Đang ở world `maze` (hành lang hẹp) → dùng `gesture_arena` |
+| Log `robot không nhúc nhích ... (kẹt / va chạm?)` | robot bị kẹt / Gazebo đứng (`ros2 topic hz /clock`); `software_render:=true` |
+| Undock không thành công | `ros2 run tb4_lab04 kill_sim.sh`, chạy lại sim; WSL2/driver lỗi: `software_render:=true` ([chi tiết](docs/LAB04_SLAM_README.md#82-đồ-hoạ--cảm-biến-hay-gặp-nhất-nhất-là-wsl2)) |
+| `world gesture_arena` không tìm thấy | chưa build lại sau khi cập nhật repo (`colcon build ...`), hoặc Gazebo Fortress quá cũ (< 6.16 không đọc `GZ_SIM_RESOURCE_PATH`) → `sudo apt upgrade` hoặc dùng `world:=depot` |
 
 ---
 
-## 10. Kiến trúc: package, node, topic, action
-
-### 10.1. Cấu trúc repo
+## 10. Kiến trúc: node, topic, luồng xử lý
 
 ```
-tb4_lab04/                               # package ament_cmake "tb4_lab04"
-├── launch/
-│   ├── navigation.launch.py             # Gazebo + vật thể + map_server/AMCL + Nav2 + RViz2   (Phần 1, 3)
-│   ├── yolo.launch.py                   # node YOLO + config/yolo.yaml                        (Phần 4)
-│   ├── demo.launch.py                   # tất cả + node điều hướng
-│   ├── tb4_lab04_common.py              # phần dùng chung: kiểm tra gói, include TurtleBot 4, RViz
-│   └── sim.launch.py, mapping.launch.py, explore.launch.py      # bài tuần trước (SLAM)
-├── scripts/
-│   ├── waypoint_navigator.py            # NODE ĐIỀU HƯỚNG: nav2_simple_commander, Goal 1 -> 2 -> 3
-│   ├── yolo_detector.py                 # NODE YOLO: Image -> cv_bridge -> YOLO -> bbox/terminal/topic
-│   ├── spawn_objects.py                 # thêm vật thể Gazebo Fuel vào world maze
-│   ├── goal_recorder.py                 # ghi toạ độ goal từ /clicked_point, /amcl_pose
-│   ├── check_goals.py                   # kiểm tra goal trên bản đồ + vẽ ảnh báo cáo
-│   ├── localization_check.py            # LiDAR có trùng tường bản đồ (đánh giá initial pose)
-│   ├── lab_common.py                    # tiện ích dùng chung (Ctrl+C, đường dẫn, góc)
-│   ├── compare_pose.py, nav_monitor.py, dock_obstacle.py, wait_for_sim.py, doctor.sh, kill_sim.sh, ...
-├── config/
-│   ├── goals.yaml                       # toạ độ Goal 1..3 (frame map)
-│   ├── objects.yaml                     # vật thể: model Fuel, toạ độ, footprint, lớp COCO
-│   ├── yolo.yaml                        # tham số node YOLO
-│   ├── localization.yaml, nav2.yaml     # AMCL + map_server, Nav2 (gốc TurtleBot 4 + chỉnh sửa có lý do)
-│   └── slam.yaml, nav2_explore.yaml, create3_*.yaml
-├── maps/map.yaml, maps/map.pgm          # bản đồ world maze của tuần trước
-├── rviz/nav.rviz                        # map + LiDAR + AMCL + costmap + plan + panel YOLO + marker goal
-├── docs/                                # report/ (mã dựng báo cáo PDF), report_info.yaml, LAB04_SLAM_README.md
-└── test/                                # unit test
+ Webcam ──> gesture_recognition_node ──/detected_gesture (String, ~30 Hz)──> robot_behavior_node ──/cmd_vel──> Create 3
+            OpenCV → MediaPipe → Wave →  <──/robot_behavior/state (JSON)──   state machine → SegmentRunner      (Gazebo)
+            ngưỡng → bỏ phiếu                                               watchdog, cooldown, an toàn LiDAR
+                                                     /odom, /scan, /dock_status, action /undock  <──────────────┘
 ```
 
-### 10.2. Luồng dữ liệu
-
-```
-                 ┌──────────────────── Gazebo Fortress (world maze + vật thể Fuel) ───────────────────┐
-                 │  TurtleBot 4: RPLIDAR, OAK-D (rgbd_camera 320x240), Create 3 (diff drive, dock)     │
-                 └──┬───────────┬──────────────────┬──────────────────────┬────────────────▲─────────┘
-            /scan (LaserScan)  /odom, TF odom→base_link  /oakd/rgb/preview/image_raw   /cmd_vel│
-                    │           │                    │                                     │
-  topic_tools delay ▼ /scan_nav │                    ▼                                     │
-  maps/map.yaml ─► map_server ─► /map ─┐       yolo_detector ─► /yolo/image_annotated      │
-                    │                  ▼          (cv_bridge,     /yolo/detections         │
-                    └──────────────► amcl ─► TF map→odom, /amcl_pose   YOLO)  cửa sổ OpenCV  │
-                                         ▲ /initialpose                                    │
-  goals.yaml ─► waypoint_navigator ──────┘                                                 │
-   (BasicNavigator)  │ action /undock (Create 3)                                           │
-                     │ action /navigate_to_pose ─► bt_navigator (Behavior Tree)            │
-                     │                              ├► planner_server (NavFn, global costmap) ─► /plan
-                     │                              ├► controller_server (DWB, local costmap) ─► velocity_smoother ┘
-                     │                              └► behavior_server (spin/backup/wait – recovery)
-                     └► /nav_goals/markers (RViz2)
-```
-
-### 10.3. Node / package chính
-
-| Node | Package | Vai trò |
+| Node | File | Vai trò |
 |---|---|---|
-| Gazebo + `ros_gz_bridge`, `motion_control`… | `turtlebot4_ignition_bringup`, `irobot_create_*` | mô phỏng robot, cảm biến, dock |
-| `spawn_objects.py` → `create` | `tb4_lab04`, `ros_gz_sim` | thêm vật thể vào world |
-| `map_server` | `nav2_map_server` | nạp `map.yaml/map.pgm` → `/map` |
-| `amcl` | `nav2_amcl` | định vị Monte Carlo trên bản đồ → TF `map→odom` |
-| `scan_delay` | `topic_tools` | `/scan` → `/scan_nav` trễ 0.1 s (tránh deadlock tf2 của Humble) |
-| `bt_navigator`, `planner_server`, `controller_server`, `behavior_server`, `smoother_server`, `velocity_smoother`, `waypoint_follower`, `lifecycle_manager_*` | `nav2_*` (qua `turtlebot4_navigation/nav2.launch.py`) | Nav2 |
-| `tb4_lab04_dock_obstacle` | `tb4_lab04` | đánh dấu dock (thấp hơn LiDAR) là vật cản trong costmap |
-| `tb4_waypoint_navigator` | `tb4_lab04` + `nav2_simple_commander` | **node điều hướng của bài** |
-| `yolo_detector` | `tb4_lab04` + `cv_bridge` + `ultralytics` | **node nhận diện của bài** |
+| `gesture_recognition_node` | `scripts/gesture_recognition_node.py` | webcam → MediaPipe → lọc nhiễu → `/detected_gesture`, cửa sổ hiển thị |
+| `robot_behavior_node` | `scripts/robot_behavior_node.py` | cử chỉ → máy trạng thái → `/cmd_vel`; undock; an toàn; ghi kết quả |
+| (logic thuần) | `scripts/gesture_logic.py` | WaveDetector, GestureStabilizer, BehaviorStateMachine, SegmentRunner – có unit test |
+| Gazebo + TurtleBot 4 | `turtlebot4_ignition_bringup` (qua `gesture_sim.launch.py`) | mô phỏng, `motion_control` nhận `/cmd_vel` |
 
-### 10.4. Topic / action / service chính
-
-| Tên | Kiểu | Dùng cho |
+| Topic / action | Kiểu | Pub → Sub |
 |---|---|---|
-| `/scan` → `/scan_nav` | `sensor_msgs/msg/LaserScan` | AMCL, costmap, `localization_check.py` |
-| `/odom`, `/tf`, `/tf_static` | `nav_msgs/msg/Odometry`, `tf2_msgs/msg/TFMessage` | cây frame `map → odom → base_link → cảm biến` |
-| `/map` | `nav_msgs/msg/OccupancyGrid` | map_server → AMCL, global costmap, RViz2 |
-| `/initialpose` | `geometry_msgs/msg/PoseWithCovarianceStamped` | navigator / 2D Pose Estimate → AMCL |
-| `/amcl_pose`, `/particle_cloud` | `PoseWithCovarianceStamped`, `nav2_msgs/msg/ParticleCloud` | pose ước lượng, tập hạt |
-| `/clicked_point` | `geometry_msgs/msg/PointStamped` | RViz2 Publish Point → `goal_recorder.py` |
-| `/navigate_to_pose` (action) | `nav2_msgs/action/NavigateToPose` | navigator → bt_navigator (feedback: quãng đường còn lại, ETA, recovery) |
-| `/spin` (action) | `nav2_msgs/action/Spin` | `look_around` |
-| `/undock`, `/dock` (action), `/dock_status` | `irobot_create_msgs` | rời / vào dock |
-| `/<node>/get_state` (service) | `lifecycle_msgs/srv/GetState` | navigator chờ `amcl`, `bt_navigator` active |
-| `/global_costmap/clear_entirely_global_costmap`, `/local_costmap/...` (service) | `nav2_msgs/srv/ClearEntireCostmap` | xoá costmap trước khi thử lại goal |
-| `/plan`, `/local_plan` | `nav_msgs/msg/Path` | đường đi toàn cục / cục bộ |
-| `/cmd_vel` | `geometry_msgs/msg/Twist` | Nav2 → Create 3 |
-| `/oakd/rgb/preview/image_raw` | `sensor_msgs/msg/Image` (rgb8 320x240) | camera → YOLO |
-| `/yolo/image_annotated` | `sensor_msgs/msg/Image` (bgr8) | ảnh đã vẽ bbox → RViz2 |
-| `/yolo/detections` | `vision_msgs/msg/Detection2DArray` | kết quả nhận diện |
-| `/nav_goals/markers` | `visualization_msgs/msg/MarkerArray` | goal trên RViz2 |
+| `/detected_gesture` | `std_msgs/msg/String` | gesture_recognition_node → robot_behavior_node |
+| `/detected_gesture/info` | `std_msgs/msg/String` (JSON) | gesture_recognition_node → (debug) |
+| `/robot_behavior/state` | `std_msgs/msg/String` (JSON) | robot_behavior_node → gesture_recognition_node (hiển thị) |
+| `/cmd_vel` | `geometry_msgs/msg/Twist` | robot_behavior_node → motion_control (Create 3) |
+| `/odom` | `nav_msgs/msg/Odometry` | diffdrive_controller → robot_behavior_node |
+| `/scan` | `sensor_msgs/msg/LaserScan` | RPLIDAR (Gazebo) → robot_behavior_node |
+| `/dock_status` | `irobot_create_msgs/msg/DockStatus` | Create 3 → robot_behavior_node |
+| `/undock` (action) | `irobot_create_msgs/action/Undock` | robot_behavior_node → Create 3 |
+| `/gesture/image` | `sensor_msgs/msg/Image` | chỉ khi `publish_image:=true` |
 
-### 10.5. Nav2 lập kế hoạch thế nào (tóm tắt cho báo cáo)
-
-1. `waypoint_navigator` gửi goal (PoseStamped, frame `map`) qua action `/navigate_to_pose`.
-2. `bt_navigator` chạy cây hành vi mặc định `navigate_to_pose_w_replanning_and_recovery`: cứ **1 Hz** gọi
-   `planner_server` lập lại đường, giao đường cho `controller_server`; thất bại thì chạy nhánh recovery (xoá costmap,
-   xoay, chờ, lùi) rồi thử lại.
-3. `planner_server` – **NavFn** (Dijkstra) trên **global costmap** = bản đồ tĩnh + vật cản LiDAR (`/scan_nav`) + dock +
-   vùng thổi phồng (`inflation_radius` 0.45 m, `robot_radius` 0.175 m) → `/plan`.
-4. `controller_server` – **DWB**: mỗi chu kỳ 20 Hz lấy mẫu các cặp (v, ω) trong giới hạn gia tốc, mô phỏng quỹ đạo
-   1.7 s trên **local costmap** (3×3 m quanh robot, frame `odom`), chấm điểm bằng các critic (bám đường, hướng tới
-   goal, tránh vật cản, chống dao động) → `/cmd_vel` (≤ 0.26 m/s) qua `velocity_smoother`.
-5. Goal đạt khi robot cách goal ≤ 0.25 m và lệch hướng ≤ 0.25 rad (`general_goal_checker`).
-6. AMCL cập nhật TF `map→odom` liên tục từ LiDAR, nên dù odometry trôi, đường đi vẫn đúng trên bản đồ.
+```
+tb4_lab04/
+├── launch/gesture_sim.launch.py, gesture.launch.py, gesture_demo.launch.py   # Bài 6
+├── scripts/gesture_recognition_node.py, robot_behavior_node.py, gesture_logic.py,
+│           webcam_test.py, check_cmd_vel.py, gesture_sequence.py, plot_gesture_run.py,
+│           install_gesture_deps.sh
+├── config/gesture.yaml          # tham số 2 node
+├── worlds/gesture_arena.sdf     # sân 9 m x 9 m
+├── models/gesture_recognizer.task
+├── test/test_gesture_logic.py
+├── docs/report/build_report_bai6.py, diagrams_bai6.py
+└── (các file của bài 4, 5: SLAM, Nav2, YOLO – xem docs/)
+```
 
 ---
 
 ## 11. Tham số
 
-`navigation.launch.py`: chung (`world` maze, `model` standard|lite, `x y z yaw`, `use_rviz`, `rviz_config`,
-`software_render`, `cliff_reflex`) + `map`, `use_nav2`, `spawn_objects` (true), `objects_file`,
-`localization_params_file`, `nav2_params_file`, `localization_delay` (2 s), `nav2_delay` (8 s).
+Đầy đủ, có chú thích: [`config/gesture.yaml`](config/gesture.yaml). Tham số launch của `gesture.launch.py`:
+`camera_source`, `show_window`, `mirror`, `wave_requires_confirm`, `auto_undock`, `setup_forward`,
+`window_position` (vd `1000,0` – đặt cửa sổ webcam cạnh Gazebo khi quay video),
+`run_recognition`, `run_behavior`, `gesture_params_file`. `gesture_sim.launch.py`: `world` (mặc định
+`gesture_arena`), `use_rviz` (false), `software_render`, `x y z yaw`, `model`.
 
-`yolo.launch.py`: `yolo_params_file`, `yolo_model`, `conf`, `device`, `image_topic`, `show_window`.
-
-`demo.launch.py`: tất cả ở trên + `run_navigator` (true), `navigator_delay` (25 s), `goals_file`, `run_yolo` (true).
-
-`waypoint_navigator.py` (`--ros-args -p tên:=giá_trị`): `goals_file`, `initial_pose_mode` (auto|always|never),
-`undock` (true), `pause_at_goal` (2 s), `look_around` (false), `goal_timeout` (300 s), `max_retries` (1),
-`loops` (1), `return_home` (false), `dock_at_end` (false), `startup_timeout` (300 s), `results_dir`.
-
-`yolo_detector.py`: xem chú thích trong `config/yolo.yaml`.
-
-Xem đầy đủ: `ros2 launch tb4_lab04 <file>.launch.py --show-args`.
+`wave_requires_confirm` (mặc định **true**): đề vừa ghi “Vẫy tay → robot xoay trái–phải để chào lại”, vừa yêu
+cầu “robot chỉ thực hiện hành vi sau khi nhận được cử chỉ xác nhận”. Mặc định chọn cách thoả cả hai: vẫy tay
+**chọn** hành vi chào, ngón cái xác nhận. Muốn robot chào lại ngay khi vẫy:
+`ros2 launch tb4_lab04 gesture.launch.py wave_requires_confirm:=false`.
 
 ---
 
-## 12. Kiểm thử
+## 12. Kiểm thử và giới hạn
 
-```bash
-cd ~/workspaces/tb4_gazebo/src/tb4_lab04
-python3 test/test_nav_yolo_logic.py      # logic bài này (đọc goal, kiểm tra goal, cache Fuel, YOLO helper, ...)
-python3 test/test_pure_logic.py          # logic bài tuần trước
-```
+Đã kiểm thử trong môi trường ảo (ROS 2 Humble + TurtleBot 4 Simulator + Gazebo Fortress 6.16 headless, MediaPipe
+0.10.21/NumPy 1.26 trên Python 3.10 và MediaPipe 1.1/NumPy 2 trên Python 3.12):
+- `python3 test/test_gesture_logic.py` – 60 test (lọc nhiễu, vẫy tay, máy trạng thái, kế hoạch chuyển động
+  trên robot động học có trễ, an toàn LiDAR, cấu hình);
+- MediaPipe trên ảnh tay thật (bộ ảnh mẫu HaGRID): nhận đúng `Closed_Fist, Open_Palm, Pointing_Up, Thumb_Up,
+  Thumb_Down, Victory` (độ tin cậy 0,59–0,83) và `Wave` từ ảnh bàn tay xoè dịch qua lại;
+- end-to-end: video thử → `gesture_recognition_node` → `robot_behavior_node` → TurtleBot 4 trong Gazebo;
+- kiểm thử tích hợp tự động với TurtleBot 4 Simulator (22/22 bước đạt): undock + ra giữa sân 0,999 m; chào
+  ±34°, về đúng hướng (lệch 0,0°); tiến–lùi 4 lần về lệch 1 mm (giữ ngón cái thêm 3 s vẫn chỉ chạy 1 lần);
+  xoè tay → dừng < 0,6 s, ngón cái → chạy lại; vòng tròn đường kính 1,00 m, khép kín sai 1,1 cm; nắm tay → huỷ;
+  ngừng gửi cử chỉ → dừng sau ~1 s; Ctrl+C → gửi Twist 0 rồi thoát;
+- xoè tay khi robot mới lùi khỏi dock 0,2 m (còn quay mặt vào dock) rồi xác nhận vòng tròn: robot quay ra xa
+  dock, chạy ra giữa sân rồi mới chạy vòng tròn – không lúc nào tiến lại gần dock (8/8 bước);
+- nhận diện từ video thử: xử lý đủ 30 FPS (giới hạn `max_fps` không còn bỏ nhầm khung).
 
-Tài liệu tham khảo: [TurtleBot 4 Navigator](https://turtlebot.github.io/turtlebot4-user-manual/tutorials/turtlebot4_navigator.html) ·
-[Nav2 Simple Commander API](https://docs.nav2.org/commander_api/index.html) ·
-[Ultralytics YOLO](https://docs.ultralytics.com/) · [TurtleBot 4 Simulator](https://github.com/turtlebot/turtlebot4_simulator) ·
-[Gazebo Fuel](https://app.gazebosim.org/fuel/models)
+Giới hạn (nói thẳng):
+- Không kiểm thử được webcam thật trong môi trường ảo – độ chính xác thực tế phụ thuộc ánh sáng, nền, khoảng
+  cách; ngưỡng mặc định là điểm khởi đầu, có thể phải chỉnh trong `config/gesture.yaml`.
+- `Wave` là luật tự đặt trên landmark (không phải model học máy): vẫy quá chậm/hẹp, hoặc FPS < ~8 (máy quá
+  tải), sẽ không nhận – đã gặp khi kiểm thử trên máy ảo 2 nhân chạy cùng Gazebo.
+- `Open_Palm` vừa là “dừng” vừa là tư thế đầu của “vẫy tay” → vẫy khi robot đang chạy sẽ dừng robot (an toàn
+  được ưu tiên hơn tiện lợi).
+- Hành vi chạy vòng hở theo `/odom` (không có bản đồ / Nav2): odometry trôi theo thời gian; lớp an toàn LiDAR
+  chỉ xét quạt ±34° theo hướng chạy, không xét khi quay tại chỗ.
+- Mô phỏng chậm (real-time factor < 1) làm hành vi kéo dài theo thời gian thực, nhưng quãng đường / góc vẫn
+  đúng vì đo bằng odom; mọi giới hạn thời gian của chuyển động (tăng/giảm tốc, phát hiện kẹt, undock) tính theo
+  **giờ mô phỏng** (stamp của `/odom`) nên máy yếu không bị báo "quá thời gian" oan (đã thử ở real-time factor
+  0,05–0,07). Watchdog cử chỉ thì tính theo giờ thực.
+
+Tài liệu tham khảo: [MediaPipe Gesture Recognizer](https://ai.google.dev/edge/mediapipe/solutions/vision/gesture_recognizer) ·
+[OpenCV](https://docs.opencv.org/) · [TurtleBot 4 User Manual](https://turtlebot.github.io/turtlebot4-user-manual/) ·
+[HaGRID dataset](https://github.com/hukenovs/hagrid) (ảnh mẫu dùng khi kiểm thử).

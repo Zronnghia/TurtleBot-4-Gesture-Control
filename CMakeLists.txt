@@ -1,13 +1,14 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.10)
 project(tb4_lab04)
 
 find_package(ament_cmake REQUIRED)
 
-# Launch, cấu hình (goal, vật thể, YOLO, Nav2...), RViz và bản đồ -> share/tb4_lab04/
+# Launch, cấu hình (goal, vật thể, YOLO, Nav2, cử chỉ...), RViz, bản đồ, world Gazebo và model MediaPipe
+# -> share/tb4_lab04/
 # (thư mục maps/ luôn có README.md nên không bao giờ rỗng -> install không lỗi
 #  ngay cả khi chưa làm Phần 2)
 install(
-  DIRECTORY launch config rviz maps
+  DIRECTORY launch config rviz maps worlds models
   DESTINATION share/${PROJECT_NAME}
 )
 
@@ -34,12 +35,20 @@ install(
     scripts/doctor.sh
     scripts/install_yolo_deps.sh
     scripts/collect_debug.sh
+    # Bài 6 – cử chỉ tay
+    scripts/gesture_recognition_node.py
+    scripts/robot_behavior_node.py
+    scripts/webcam_test.py
+    scripts/check_cmd_vel.py
+    scripts/gesture_sequence.py
+    scripts/plot_gesture_run.py
+    scripts/install_gesture_deps.sh
   DESTINATION lib/${PROJECT_NAME}
 )
 
 # Module Python dùng chung, được các script trên `import lab_common` (cùng thư mục, không chạy trực tiếp)
 install(
-  FILES scripts/lab_common.py
+  FILES scripts/lab_common.py scripts/gesture_logic.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
